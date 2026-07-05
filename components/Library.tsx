@@ -46,14 +46,29 @@ export default function Library() {
       try {
         let lastId: string | null = null;
         for (const file of pdfs) {
-          const form = new FormData();
-          form.append("file", file);
-          const res = await fetch("/api/books", { method: "POST", body: form });
+          // Step 1: register the book; the server says where the bytes go.
+          const res = await fetch("/api/books", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fileName: file.name, size: file.size }),
+          });
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
             throw new Error(data.error || `Upload failed (${res.status})`);
           }
           const data = await res.json();
+
+          // Step 2: send the PDF bytes (to our server, or straight to storage).
+          const up = await fetch(data.upload.url, {
+            method: data.upload.method,
+            headers: { ...data.upload.headers, "Content-Type": "application/pdf" },
+            body: file,
+          });
+          if (!up.ok) {
+            await fetch(`/api/books/${data.book.id}`, { method: "DELETE" }).catch(() => {});
+            const detail = await up.json().catch(() => ({}));
+            throw new Error(detail.error || detail.message || `Upload failed (${up.status})`);
+          }
           lastId = data.book.id;
         }
         await refresh();

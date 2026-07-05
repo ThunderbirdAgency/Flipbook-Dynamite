@@ -6,7 +6,12 @@ Turn any PDF into an interactive page-flipping book — with realistic flip anim
 
 - **Drag & drop PDF upload** (up to 100 MB, multiple files at once)
 - **Realistic page-flip animation** — drag page corners, click, swipe, or use arrow keys ([StPageFlip](https://github.com/Nodlik/StPageFlip))
+- **Page-flip sound** 🔊 — synthesized paper swish on every turn (mutable, remembered per browser)
 - **Clickable links preserved** — external URLs in the PDF open in a new tab; internal links (table of contents, cross-references) flip to the right page
+- **Thumbnail strip** — jump to any page from a sidebar of page previews
+- **Table of contents** — built automatically from the PDF's bookmarks/outline
+- **Zoom** — pan, scroll-wheel zoom, and page-through at up to 500%
+- **Autoplay** — hands-free page turning until the back cover
 - **Shareable URL** for every book: `/book/<id>`
 - **Embed code** — drop an `<iframe>` of `/embed/<id>` into any website
 - **Library** with first-page thumbnails, copy-link and delete actions
@@ -46,7 +51,12 @@ npm start
 
 ### Storage
 
-Books live on the local filesystem under `data/` (configurable via the `FLIPBOOK_DATA_DIR` environment variable). This is perfect for a single server / Docker volume. For serverless hosts with ephemeral disks (e.g. Vercel), swap `lib/store.ts` for object storage (S3, Supabase Storage, Vercel Blob) — it's the only file that touches disk.
+Two backends, selected automatically:
+
+- **Supabase** (cloud deploys): set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Metadata lives in a `flipbook_books` table, PDFs in a public `flipbook-pdfs` storage bucket. Browsers upload directly to storage (sidestepping serverless body-size limits) and read PDFs from the storage CDN.
+- **Local filesystem** (default): books under `data/` (override with `FLIPBOOK_DATA_DIR`). Zero config for local dev or a Docker volume.
+
+Uploads are two-step: `POST /api/books` registers the book and returns the upload target; the client then sends the PDF bytes there.
 
 ## Stack
 

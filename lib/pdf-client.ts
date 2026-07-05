@@ -21,6 +21,17 @@ export interface RenderedPage {
   links: PageLink[];
 }
 
+export interface OutlineItem {
+  title: string;
+  pageIndex: number;
+  depth: number;
+}
+
+export interface RenderedPdf {
+  pages: RenderedPage[];
+  outline: OutlineItem[];
+}
+
 // The "legacy" build ships transpiled + polyfilled code; the modern build
 // needs bleeding-edge JS features (e.g. Map.getOrInsertComputed) that many
 // browsers don't have yet.
@@ -45,13 +56,15 @@ export async function renderPdfToPages(
   pdfUrl: string,
   onProgress?: (done: number, total: number) => void,
   signal?: { cancelled: boolean }
-): Promise<RenderedPage[]> {
+): Promise<RenderedPdf> {
   const pdfjs = await loadPdfjs();
   const task = pdfjs.getDocument({ url: pdfUrl });
   const doc = await task.promise;
   const pages: RenderedPage[] = [];
+  let outline: OutlineItem[] = [];
 
   try {
+    outline = await extractOutline(doc);
     for (let i = 1; i <= doc.numPages; i++) {
       if (signal?.cancelled) break;
       const page = await doc.getPage(i);
@@ -97,9 +110,45 @@ export async function renderPdfToPages(
 
   if (signal?.cancelled) {
     pages.forEach((p) => URL.revokeObjectURL(p.objectUrl));
-    return [];
+    return { pages: [], outline: [] };
   }
-  return pages;
+  return { pages, outline };
+}
+
+/** Flatten the PDF's bookmark tree into a list with depth markers. */
+async function extractOutline(
+  doc: Awaited<ReturnType<Pdfjs["getDocument"]>["promise"]>
+): Promise<OutlineItem[]> {
+  const items: OutlineItem[] = [];
+  let nodes: Awaited<ReturnType<(typeof doc)["getOutline"]>>;
+  try {
+    nodes = await doc.getOutline();
+  } catch {
+    return items;
+  }
+  if (!nodes) return items;
+
+  type OutlineNode = (typeof nodes)[number];
+  const walk = async (list: OutlineNode[], depth: number) => {
+    for (const node of list) {
+      if (depth > 3 || items.length > 200) return; // sanity bounds
+      try {
+        const dest =
+          typeof node.dest === "string" ? await doc.getDestination(node.dest) : node.dest;
+        if (Array.isArray(dest) && dest[0]) {
+          const pageIndex = await doc.getPageIndex(
+            dest[0] as Parameters<(typeof doc)["getPageIndex"]>[0]
+          );
+          items.push({ title: node.title || `Page ${pageIndex + 1}`, pageIndex, depth });
+        }
+      } catch {
+        // Skip entries whose destination can't be resolved.
+      }
+      if (node.items?.length) await walk(node.items, depth + 1);
+    }
+  };
+  await walk(nodes, 0);
+  return items;
 }
 
 /**

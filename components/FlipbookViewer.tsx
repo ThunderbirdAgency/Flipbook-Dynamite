@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PageFlip } from "page-flip";
-import { renderPdfToPages, RenderedPage } from "@/lib/pdf-client";
+import { renderPdfToPages, OutlineItem, RenderedPage } from "@/lib/pdf-client";
+import { playFlipSound } from "@/lib/flip-sound";
 import ShareDialog from "@/components/ShareDialog";
+import ZoomOverlay from "@/components/ZoomOverlay";
+import ThumbnailStrip from "@/components/ThumbnailStrip";
+import TocPanel from "@/components/TocPanel";
 
 interface FlipbookViewerProps {
   pdfUrl: string;
@@ -15,6 +19,8 @@ interface FlipbookViewerProps {
 
 type Status = "loading" | "ready" | "error";
 
+const AUTOPLAY_INTERVAL_MS = 3500;
+
 export default function FlipbookViewer({
   pdfUrl,
   title,
@@ -23,18 +29,31 @@ export default function FlipbookViewer({
   embedUrl,
 }: FlipbookViewerProps) {
   const [pages, setPages] = useState<RenderedPage[] | null>(null);
+  const [outline, setOutline] = useState<OutlineItem[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [current, setCurrent] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const [showThumbs, setShowThumbs] = useState(false);
+  const [showToc, setShowToc] = useState(false);
+  const [autoplay, setAutoplay] = useState(false);
+  const [muted, setMuted] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("fbd-muted") === "1"
+  );
 
   const containerRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<HTMLDivElement>(null);
   const flipRef = useRef<PageFlip | null>(null);
+  // Mirror for event handlers registered once at PageFlip init.
+  const mutedRef = useRef(muted);
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
 
-  // Phase 1: rasterize the PDF into page images + link maps.
+  // Phase 1: rasterize the PDF into page images + link maps + outline.
   useEffect(() => {
     const signal = { cancelled: false };
     let rendered: RenderedPage[] = [];
@@ -42,9 +61,10 @@ export default function FlipbookViewer({
     renderPdfToPages(pdfUrl, (done, total) => setProgress({ done, total }), signal)
       .then((result) => {
         if (signal.cancelled) return;
-        rendered = result;
-        if (result.length === 0) throw new Error("The PDF has no pages.");
-        setPages(result);
+        rendered = result.pages;
+        if (result.pages.length === 0) throw new Error("The PDF has no pages.");
+        setPages(result.pages);
+        setOutline(result.outline);
         setStatus("ready");
       })
       .catch((err) => {
@@ -90,6 +110,10 @@ export default function FlipbookViewer({
       });
       flip.loadFromHTML(bookRef.current.querySelectorAll(".fb-page"));
       flip.on("flip", (e) => setCurrent(e.data as number));
+      flip.on("changeState", (e) => {
+        // "flipping" fires when a page-turn animation starts.
+        if (e.data === "flipping" && !mutedRef.current) playFlipSound();
+      });
       flipRef.current = flip;
       setCurrent(flip.getCurrentPageIndex());
     })();
@@ -109,12 +133,13 @@ export default function FlipbookViewer({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (zoomOpen) return; // the zoom overlay has its own key handling
       if (e.key === "ArrowRight") flipRef.current?.flipNext();
       if (e.key === "ArrowLeft") flipRef.current?.flipPrev();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [zoomOpen]);
 
   // Track fullscreen state.
   useEffect(() => {
@@ -122,6 +147,22 @@ export default function FlipbookViewer({
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
+
+  // Autoplay: keep flipping until the back cover, then stop.
+  const total = pages?.length ?? 0;
+  useEffect(() => {
+    if (!autoplay) return;
+    const timer = setInterval(() => {
+      const flip = flipRef.current;
+      if (!flip) return;
+      if (flip.getCurrentPageIndex() >= flip.getPageCount() - 1) {
+        setAutoplay(false);
+      } else {
+        flip.flipNext();
+      }
+    }, AUTOPLAY_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [autoplay]);
 
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) {
@@ -135,7 +176,12 @@ export default function FlipbookViewer({
     flipRef.current?.flip(pageIndex);
   }, []);
 
-  const total = pages?.length ?? 0;
+  const toggleMuted = useCallback(() => {
+    setMuted((m) => {
+      localStorage.setItem("fbd-muted", m ? "0" : "1");
+      return !m;
+    });
+  }, []);
 
   return (
     <div
@@ -143,7 +189,9 @@ export default function FlipbookViewer({
       className="relative flex h-full w-full flex-col overflow-hidden bg-slate-950"
     >
       {/* Stage */}
-      <div className="relative flex-1 overflow-hidden px-4 pt-4 pb-20 sm:px-10">
+      <div
+        className={`relative flex-1 overflow-hidden px-4 pt-4 pb-20 sm:px-10 ${showThumbs ? "pl-36 sm:pl-44" : ""} ${showToc ? "pr-72" : ""}`}
+      >
         {status === "loading" && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 text-slate-300">
             <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-600 border-t-amber-400" />
@@ -235,10 +283,44 @@ export default function FlipbookViewer({
         )}
       </div>
 
+      {/* Side panels */}
+      {status === "ready" && pages && showThumbs && (
+        <ThumbnailStrip pages={pages} current={current} onSelect={goToPage} />
+      )}
+      {status === "ready" && showToc && outline.length > 0 && (
+        <TocPanel
+          outline={outline}
+          onSelect={(p) => {
+            goToPage(p);
+            setShowToc(false);
+          }}
+          onClose={() => setShowToc(false)}
+        />
+      )}
+
       {/* Toolbar */}
       {status === "ready" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center pb-4">
-          <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-slate-700/60 bg-slate-900/90 px-3 py-2 shadow-xl backdrop-blur">
+          <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-1 rounded-full border border-slate-700/60 bg-slate-900/90 px-3 py-2 shadow-xl backdrop-blur">
+            <ToolbarButton
+              label="Thumbnails"
+              active={showThumbs}
+              onClick={() => setShowThumbs((v) => !v)}
+            >
+              <ThumbsIcon />
+            </ToolbarButton>
+            {outline.length > 0 && (
+              <ToolbarButton
+                label="Table of contents"
+                active={showToc}
+                onClick={() => setShowToc((v) => !v)}
+              >
+                <TocIcon />
+              </ToolbarButton>
+            )}
+
+            <div className="mx-1 h-5 w-px bg-slate-700" />
+
             <ToolbarButton label="First page" onClick={() => goToPage(0)}>
               <SkipIcon flipped />
             </ToolbarButton>
@@ -253,6 +335,25 @@ export default function FlipbookViewer({
             </ToolbarButton>
             <ToolbarButton label="Last page" onClick={() => goToPage(total - 1)}>
               <SkipIcon />
+            </ToolbarButton>
+
+            <div className="mx-1 h-5 w-px bg-slate-700" />
+
+            <ToolbarButton
+              label={autoplay ? "Stop autoplay" : "Autoplay"}
+              active={autoplay}
+              onClick={() => setAutoplay((v) => !v)}
+            >
+              {autoplay ? <PauseIcon /> : <PlayIcon />}
+            </ToolbarButton>
+            <ToolbarButton label="Zoom" onClick={() => setZoomOpen(true)}>
+              <ZoomIcon />
+            </ToolbarButton>
+            <ToolbarButton
+              label={muted ? "Unmute page-flip sound" : "Mute page-flip sound"}
+              onClick={toggleMuted}
+            >
+              <SoundIcon muted={muted} />
             </ToolbarButton>
 
             <div className="mx-1 h-5 w-px bg-slate-700" />
@@ -289,6 +390,15 @@ export default function FlipbookViewer({
           title={title}
           shareUrl={shareUrl}
           embedUrl={embedUrl}
+        />
+      )}
+
+      {zoomOpen && pages && (
+        <ZoomOverlay
+          pages={pages}
+          startIndex={Math.min(current, pages.length - 1)}
+          title={title}
+          onClose={() => setZoomOpen(false)}
         />
       )}
     </div>
@@ -348,16 +458,22 @@ function PageIndicator({
 function ToolbarButton({
   label,
   onClick,
+  active,
   children,
 }: {
   label: string;
   onClick: () => void;
+  active?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
-      className="flex h-9 w-9 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-700/70 hover:text-white"
+      className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
+        active
+          ? "bg-amber-400 text-slate-950 hover:bg-amber-300"
+          : "text-slate-300 hover:bg-slate-700/70 hover:text-white"
+      }`}
       title={label}
       aria-label={label}
     >
@@ -379,6 +495,77 @@ function SkipIcon({ flipped }: { flipped?: boolean }) {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={flipped ? { transform: "scaleX(-1)" } : undefined}>
       <polyline points="7 18 13 12 7 6" />
       <line x1="17" y1="6" x2="17" y2="18" />
+    </svg>
+  );
+}
+
+function ThumbsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="9" rx="1" />
+      <rect x="14" y="3" width="7" height="9" rx="1" />
+      <rect x="3" y="16" width="7" height="5" rx="1" />
+      <rect x="14" y="16" width="7" height="5" rx="1" />
+    </svg>
+  );
+}
+
+function TocIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </svg>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+      <polygon points="6 4 20 12 6 20" />
+    </svg>
+  );
+}
+
+function PauseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <rect x="6" y="4" width="4" height="16" rx="1" />
+      <rect x="14" y="4" width="4" height="16" rx="1" />
+    </svg>
+  );
+}
+
+function ZoomIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      <line x1="11" y1="8" x2="11" y2="14" />
+      <line x1="8" y1="11" x2="14" y2="11" />
+    </svg>
+  );
+}
+
+function SoundIcon({ muted }: { muted: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19" fill="currentColor" stroke="none" />
+      {muted ? (
+        <>
+          <line x1="16" y1="9" x2="22" y2="15" />
+          <line x1="22" y1="9" x2="16" y2="15" />
+        </>
+      ) : (
+        <>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+        </>
+      )}
     </svg>
   );
 }
