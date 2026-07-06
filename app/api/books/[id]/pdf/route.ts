@@ -7,6 +7,7 @@ import {
   savePdfBuffer,
   supabaseMode,
 } from "@/lib/store";
+import { authEnabled, currentUserId } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -51,6 +52,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const book = await getBook(id);
   if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (authEnabled) {
+    const userId = await currentUserId();
+    if (!userId || book.ownerId !== userId) {
+      return NextResponse.json({ error: "Not your book" }, { status: 403 });
+    }
+  }
 
   const buffer = Buffer.from(await req.arrayBuffer());
   if (buffer.length === 0) {

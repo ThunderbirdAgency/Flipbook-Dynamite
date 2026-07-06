@@ -2,11 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { createBook, getUploadTarget, listBooks, MAX_PDF_SIZE } from "@/lib/store";
 import { Book } from "@/lib/types";
+import { authEnabled, currentUserId } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const books = await listBooks();
+  const userId = await currentUserId();
+  if (authEnabled && !userId) {
+    return NextResponse.json({ error: "Sign in to see your library" }, { status: 401 });
+  }
+  // With auth on, the library is per-user; in open mode it's shared.
+  const books = await listBooks(authEnabled ? userId! : undefined);
   return NextResponse.json({ books });
 }
 
@@ -17,6 +23,10 @@ export async function GET() {
  * sidesteps serverless request-body limits.
  */
 export async function POST(req: NextRequest) {
+  const userId = await currentUserId();
+  if (authEnabled && !userId) {
+    return NextResponse.json({ error: "Sign in to upload" }, { status: 401 });
+  }
   const body = await req.json().catch(() => null);
   if (!body || typeof body.fileName !== "string" || !body.fileName) {
     return NextResponse.json({ error: "Expected JSON with 'fileName'" }, { status: 400 });
@@ -42,6 +52,7 @@ export async function POST(req: NextRequest) {
     fileName: body.fileName.slice(0, 255),
     size,
     createdAt: new Date().toISOString(),
+    ownerId: userId ?? undefined,
   };
 
   await createBook(book);

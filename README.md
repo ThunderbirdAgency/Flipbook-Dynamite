@@ -32,6 +32,16 @@ npm run build
 npm start
 ```
 
+## Accounts & auth (Clerk)
+
+Auth switches on automatically when `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` are set (see `.env.example`):
+
+- Creators sign in (Clerk modal — email, Google, etc.) to upload and manage **their own** library
+- Books are owned: only the owner can rename or delete them
+- **Share links and embeds stay public** — viewers never need an account
+
+Without Clerk keys the app runs in open mode (no sign-in, shared library) — handy for local dev.
+
 ## How it works
 
 1. **Upload** — `POST /api/books` stores the PDF on disk (`data/pdfs/<id>.pdf`) and records metadata in `data/books.json`.

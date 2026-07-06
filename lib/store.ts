@@ -38,6 +38,7 @@ interface BookRow {
   file_name: string;
   size: number;
   created_at: string;
+  owner_id: string | null;
 }
 
 function rowToBook(row: BookRow): Book {
@@ -47,6 +48,7 @@ function rowToBook(row: BookRow): Book {
     fileName: row.file_name,
     size: Number(row.size),
     createdAt: row.created_at,
+    ownerId: row.owner_id ?? undefined,
   };
 }
 
@@ -67,8 +69,9 @@ async function sbRest(pathAndQuery: string, init?: RequestInit): Promise<Respons
   return res;
 }
 
-async function sbList(): Promise<Book[]> {
-  const res = await sbRest(`${TABLE}?select=*&order=created_at.desc`);
+async function sbList(ownerId?: string): Promise<Book[]> {
+  const filter = ownerId ? `&owner_id=eq.${encodeURIComponent(ownerId)}` : "";
+  const res = await sbRest(`${TABLE}?select=*&order=created_at.desc${filter}`);
   if (!res.ok) throw new Error(`Supabase list failed (${res.status})`);
   const rows = (await res.json()) as BookRow[];
   return rows.map(rowToBook);
@@ -91,6 +94,7 @@ async function sbCreate(book: Book): Promise<Book> {
       file_name: book.fileName,
       size: book.size,
       created_at: book.createdAt,
+      owner_id: book.ownerId ?? null,
     }),
   });
   if (!res.ok) throw new Error(`Supabase insert failed (${res.status})`);
@@ -162,10 +166,13 @@ export function assertValidId(id: string) {
   if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error("invalid book id");
 }
 
-export async function listBooks(): Promise<Book[]> {
-  if (supabaseMode) return sbList();
+/** List books; pass an ownerId to see only that user's library. */
+export async function listBooks(ownerId?: string): Promise<Book[]> {
+  if (supabaseMode) return sbList(ownerId);
   const books = await readIndex();
-  return books.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return books
+    .filter((b) => !ownerId || b.ownerId === ownerId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function getBook(id: string): Promise<Book | null> {
