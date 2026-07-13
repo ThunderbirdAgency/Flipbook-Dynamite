@@ -1,0 +1,131 @@
+# Flipbook Dynamite — Developer Handoff
+
+*Last updated: 2026-07-06*
+
+## What this is
+
+**Flipbook Dynamite** (www.flipbookdynamite.com) is an independent SaaS product that turns
+uploaded PDFs into interactive page-flipping books — the business model of
+[flippingbook.com](https://flippingbook.com), built from scratch. Creators sign in and upload
+PDFs; every book gets a public shareable URL and an iframe embed code. Viewers never need an
+account.
+
+- **Repo:** `ThunderbirdAgency/Flipbook-Dynamite` (GitHub)
+- **Working branch:** `claude/pdf-flipping-book-app-sukfbi` (currently also the default branch)
+- **Status:** feature-complete v1, fully tested locally; deploy to Vercel pending (see *Pending*)
+
+## Stack
+
+| Layer | Choice | Notes |
+| --- | --- | --- |
+| Framework | Next.js 16 (App Router, Turbopack) | ⚠️ Next 16 renamed `middleware.ts` → `proxy.ts` |
+| UI | React 19, Tailwind CSS 4 | dark theme, amber/orange brand accents |
+| PDF rendering | `pdfjs-dist` v5 **legacy build** | v6 and the modern v5 build need `Map.getOrInsertComputed`, which many browsers lack — do not "upgrade" without checking |
+| Flip engine | `page-flip` (StPageFlip) v2 | no bundled types; shim in `types/page-flip.d.ts` |
+| Auth | Clerk (`@clerk/nextjs` v7) | v7 has **no** `SignedIn`/`SignedOut` components — branch on `auth()` in server components |
+| Database + file storage | Supabase (Postgres + Storage) | dedicated project, see *Infrastructure* |
+| Hosting | Vercel (planned) | config in `vercel.json` |
+
+## Architecture
+
+### Rendering pipeline (all client-side)
+1. Viewer fetches the PDF from `/api/books/:id/pdf` (filesystem mode streams it; Supabase mode
+   307-redirects to the public storage CDN URL — CORS is `*`).
+2. `lib/pdf-client.ts` rasterizes each page to a JPEG object URL via pdf.js (max edge 1600px,
+   scale ≤2.5), extracts **link annotations** (external URLs + internal jump targets) as
+   percentage-positioned hotspots, and flattens the PDF's bookmark **outline** into a TOC.
+3. `components/FlipbookViewer.tsx` hands the rendered pages to StPageFlip and overlays the link
+   hotspots (`<a class="fb-link">`) on each page. External links open new tabs; internal links
+   call `flip(pageIndex)`.
+4. Page-flip **sound** is synthesized in `lib/flip-sound.ts` with Web Audio (two layered
+   band-passed noise swishes) — no audio asset. Triggered by StPageFlip's
+   `changeState === "flipping"` event; mute preference persists in `localStorage("fbd-muted")`.
+
+### Storage: one API, two backends (`lib/store.ts`)
+- **Supabase mode** — active when `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  are set. Metadata in `flipbook_books` table (via PostgREST, plain `fetch`, no SDK), PDFs in
+  public `flipbook-pdfs` bucket.
+- **Filesystem mode** — default fallback. `data/books.json` + `data/pdfs/*.pdf`
+  (override dir with `FLIPBOOK_DATA_DIR`). Zero-config local dev.
+
+**Uploads are two-step** (sidesteps Vercel's ~4.5 MB request-body limit):
+1. `POST /api/books` (JSON: `fileName`, `size`, optional `title`) → creates the record, returns
+   `{ book, upload: { url, method, headers } }`.
+2. Client sends the raw PDF to `upload.url` — directly to Supabase Storage (cloud) or
+   `PUT /api/books/:id/pdf` (filesystem). On failure the client deletes the record.
+
+### Auth (Clerk) — `lib/auth.ts`, `proxy.ts`
+- Auth activates **only when** `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY` are set;
+  otherwise the app runs in **open mode** (no sign-in, shared library) — intentional, so local
+  dev needs zero setup.
+- With auth on: library (`GET /api/books`) and uploads are per-user (`owner_id` = Clerk user id);
+  rename/delete require ownership. **Book pages, PDFs, share links, embeds stay public.**
+- `proxy.ts` (Next 16's middleware) conditionally runs `clerkMiddleware()`.
+
+### Routes
+| Route | Purpose |
+| --- | --- |
+| `/` | Landing + library (sign-in gated when auth is on) |
+| `/book/[id]` | Full viewer (toolbar, share dialog) |
+| `/embed/[id]` | Chrome-less viewer for iframes |
+| `GET/POST /api/books` | List (owner-scoped) / create book record |
+| `GET/PATCH/DELETE /api/books/[id]` | Metadata / rename / delete (owner-only) |
+| `GET/PUT /api/books/[id]/pdf` | Fetch PDF (public) / receive bytes (fs mode) |
+
+### Viewer features
+Flip animation (drag corners / click / swipe / arrow keys), flip sound + mute, thumbnail strip,
+TOC panel (from PDF outline), zoom overlay (wheel/drag/500%), autoplay, jump-to-page, fullscreen,
+download, share dialog (direct link + embed code), single-page portrait mode on mobile.
+
+## Infrastructure (already provisioned)
+
+- **Supabase project:** `flipbook-dynamite`, ref `tujhvzaxwjgzupqzmakx`, region us-east-2,
+  in "ThunderbirdAgency's Org" ($10/mo, created 2026-07-06).
+  - Table `public.flipbook_books` (id, title, file_name, size, created_at, owner_id) with RLS on
+    and permissive anon policies (writes are gated by the app API; see *Hardening*).
+  - Storage bucket `flipbook-pdfs`: public read, 100 MB/file cap, `application/pdf` only.
+  - Migrations were applied via the Supabase MCP as `flipbook_dynamite_init`.
+- **`vercel.json`** carries the Supabase URL + anon key (public-safe by design) and
+  `NEXT_PUBLIC_APP_URL=https://www.flipbookdynamite.com` for both runtime and build env.
+- **Leftover to ignore:** the shared project `mrmaozyegbdbhffyxmtv` briefly hosted a prototype
+  table/bucket; data was removed. An empty `flipbook_books` table + empty `flipbook-pdfs` bucket
+  may remain there — safe to drop.
+
+## Running & testing
+
+```bash
+npm install
+npm run dev        # http://localhost:3000 — open mode, filesystem storage
+npm run build && npm start
+npm run lint
+```
+
+- `predev`/`prebuild` copy the pdf.js **legacy** worker to `public/pdf.worker.min.mjs`
+  (gitignored) — see `scripts/copy-pdf-worker.mjs`.
+- To exercise cloud storage locally, set the two Supabase env vars (see `.env.example`).
+- No test framework yet; e2e was done with Playwright scripts driving upload → flip → links →
+  thumbnails → zoom → autoplay → share (all passing as of the last commit). Porting those to
+  Playwright Test in-repo is a good first task.
+
+## Pending / next steps
+
+1. **Vercel deploy** — not done. Either import the GitHub repo in the Vercel dashboard
+   (Team: Thunderbird Agency, `team_fSmicSKlbQbj2RntMmWpJZTg`) or `vercel deploy` from an
+   authenticated CLI. `vercel.json` makes it zero-config.
+2. **Clerk keys** — create the Clerk application, then set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` +
+   `CLERK_SECRET_KEY` in Vercel env. Auth turns on automatically.
+3. **Domain** — add `www.flipbookdynamite.com` in Vercel → Domains; CNAME at GoDaddy.
+4. **Logo** — owner has a brand logo to replace the placeholder SVG in `app/page.tsx` /
+   `app/book/[id]/page.tsx` + favicon.
+
+## Hardening / known gaps (v1 tradeoffs, roughly in priority order)
+
+- The Supabase **anon key can write** to the bucket/table directly (policies are permissive;
+  the app API enforces auth above it). Fix: switch writes to server-issued signed upload URLs
+  with a service-role key held only in Vercel env, and tighten RLS.
+- `books.json` fs-mode writes aren't concurrency-safe under heavy parallel use (fine for dev).
+- No pagination on the library, no rate limiting, no upload virus scanning.
+- Rendering is fully client-side; very large PDFs (100+ pages) are memory-hungry on weak
+  devices. A server-side pre-render/thumbnail pipeline is the scalable path.
+- Roadmap candidates: analytics (views per book), custom branding per book, PDF text search,
+  password-protected books, Clerk↔Supabase third-party-auth RLS integration.
