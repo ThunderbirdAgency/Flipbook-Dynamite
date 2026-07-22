@@ -212,6 +212,18 @@ async function extractLinks(
   return links;
 }
 
+/** Read a PDF's page count without rendering anything. */
+export async function getPageCount(pdfUrl: string): Promise<number> {
+  const pdfjs = await loadPdfjs();
+  const task = pdfjs.getDocument({ url: pdfUrl });
+  const doc = await task.promise;
+  try {
+    return doc.numPages;
+  } finally {
+    task.destroy().catch(() => {});
+  }
+}
+
 /** Render just the first page of a PDF into an existing canvas (thumbnails). */
 export async function renderFirstPage(
   pdfUrl: string,

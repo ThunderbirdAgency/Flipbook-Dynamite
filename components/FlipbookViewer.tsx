@@ -9,12 +9,20 @@ import ZoomOverlay from "@/components/ZoomOverlay";
 import ThumbnailStrip from "@/components/ThumbnailStrip";
 import TocPanel from "@/components/TocPanel";
 
+import type { Visibility } from "@/lib/types";
+
 interface FlipbookViewerProps {
   pdfUrl: string;
   title: string;
   downloadUrl?: string;
   shareUrl?: string;
   embedUrl?: string;
+  /** Book id — enables view/engagement analytics beacons when present. */
+  bookId?: string;
+  /** True when the current viewer owns the book (unlocks privacy + insights). */
+  isOwner?: boolean;
+  visibility?: Visibility;
+  hasPassword?: boolean;
 }
 
 type Status = "loading" | "ready" | "error";
@@ -27,6 +35,10 @@ export default function FlipbookViewer({
   downloadUrl,
   shareUrl,
   embedUrl,
+  bookId,
+  isOwner,
+  visibility = "public",
+  hasPassword = false,
 }: FlipbookViewerProps) {
   const [pages, setPages] = useState<RenderedPage[] | null>(null);
   const [outline, setOutline] = useState<OutlineItem[]>([]);
@@ -52,6 +64,43 @@ export default function FlipbookViewer({
   useEffect(() => {
     mutedRef.current = muted;
   }, [muted]);
+
+  // Owner can flip privacy from the share dialog; keep a live copy for the UI.
+  const [bookVisibility, setBookVisibility] = useState<Visibility>(visibility);
+  const [bookHasPassword, setBookHasPassword] = useState(hasPassword);
+
+  // Analytics: fire-and-forget beacons for "book opened" and "page reached".
+  const reportedPages = useRef<Set<number>>(new Set());
+  const reportEvent = useCallback(
+    (type: "view" | "page", page?: number) => {
+      if (!bookId) return;
+      if (type === "page" && page != null) {
+        if (reportedPages.current.has(page)) return;
+        reportedPages.current.add(page);
+      }
+      const url = `/api/books/${bookId}/events`;
+      const payload = JSON.stringify({ type, page });
+      try {
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(url, new Blob([payload], { type: "application/json" }));
+          return;
+        }
+      } catch {
+        // fall through to fetch
+      }
+      fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+        keepalive: true,
+      }).catch(() => {});
+    },
+    [bookId]
+  );
+  const reportEventRef = useRef(reportEvent);
+  useEffect(() => {
+    reportEventRef.current = reportEvent;
+  }, [reportEvent]);
 
   // Phase 1: rasterize the PDF into page images + link maps + outline.
   useEffect(() => {
@@ -109,7 +158,11 @@ export default function FlipbookViewer({
         flippingTime: 650,
       });
       flip.loadFromHTML(bookRef.current.querySelectorAll(".fb-page"));
-      flip.on("flip", (e) => setCurrent(e.data as number));
+      flip.on("flip", (e) => {
+        const index = e.data as number;
+        setCurrent(index);
+        reportEventRef.current("page", index + 1);
+      });
       flip.on("changeState", (e) => {
         // "flipping" fires when a page-turn animation starts.
         if (e.data === "flipping" && !mutedRef.current) playFlipSound();
@@ -140,6 +193,13 @@ export default function FlipbookViewer({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [zoomOpen]);
+
+  // Count one view when the book finishes loading, and the opening page.
+  useEffect(() => {
+    if (status !== "ready") return;
+    reportEventRef.current("view");
+    reportEventRef.current("page", 1);
+  }, [status]);
 
   // Track fullscreen state.
   useEffect(() => {
@@ -363,6 +423,16 @@ export default function FlipbookViewer({
                 <ShareIcon />
               </ToolbarButton>
             )}
+            {isOwner && bookId && (
+              <a
+                href={`/book/${bookId}/insights`}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-700/70 hover:text-white"
+                title="Insights"
+                aria-label="View insights"
+              >
+                <InsightsIcon />
+              </a>
+            )}
             {downloadUrl && (
               <a
                 href={downloadUrl}
@@ -390,6 +460,14 @@ export default function FlipbookViewer({
           title={title}
           shareUrl={shareUrl}
           embedUrl={embedUrl}
+          bookId={bookId}
+          isOwner={isOwner}
+          visibility={bookVisibility}
+          hasPassword={bookHasPassword}
+          onPrivacyChange={(v, hp) => {
+            setBookVisibility(v);
+            setBookHasPassword(hp);
+          }}
         />
       )}
 
@@ -566,6 +644,16 @@ function SoundIcon({ muted }: { muted: boolean }) {
           <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
         </>
       )}
+    </svg>
+  );
+}
+
+function InsightsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
     </svg>
   );
 }

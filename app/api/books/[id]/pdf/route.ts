@@ -8,6 +8,7 @@ import {
   supabaseMode,
 } from "@/lib/store";
 import { authEnabled, currentUserId } from "@/lib/auth";
+import { gateBookRequest } from "@/lib/gate";
 
 export const runtime = "nodejs";
 
@@ -18,9 +19,18 @@ export async function GET(req: NextRequest, { params }: Params) {
   const book = await getBook(id);
   if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // Enforce visibility/password before handing over any bytes.
+  const { decision } = await gateBookRequest(book, req);
+  if (decision === "denied") {
+    return NextResponse.json({ error: "This flipbook is private" }, { status: 403 });
+  }
+  if (decision === "needs-password") {
+    return NextResponse.json({ error: "Password required" }, { status: 401 });
+  }
+
   const download = req.nextUrl.searchParams.get("download") === "1";
   const safeName = book.fileName.replace(/[^\w.\- ]+/g, "_") || "document.pdf";
-  const delivery = getPdfDelivery(id, download, safeName);
+  const delivery = await getPdfDelivery(id, download, safeName);
 
   if (delivery.kind === "redirect") {
     return NextResponse.redirect(delivery.url, 307);
@@ -37,7 +47,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Length": String(data.length),
-      "Cache-Control": "public, max-age=3600",
+      // Private books must never be cached by shared caches/CDNs.
+      "Cache-Control":
+        book.visibility === "private" || book.hasPassword
+          ? "private, no-store"
+          : "public, max-age=3600",
       "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${safeName}"`,
     },
   });
@@ -46,7 +60,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 /** Step 2 of an upload in filesystem mode: receive the raw PDF bytes. */
 export async function PUT(req: NextRequest, { params }: Params) {
   if (supabaseMode) {
-    // In Supabase mode the client uploads directly to object storage.
+    // In Supabase mode the client uploads directly to signed storage.
     return NextResponse.json({ error: "Uploads go directly to storage" }, { status: 405 });
   }
   const { id } = await params;

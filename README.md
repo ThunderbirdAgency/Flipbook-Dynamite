@@ -14,7 +14,9 @@ Turn any PDF into an interactive page-flipping book — with realistic flip anim
 - **Autoplay** — hands-free page turning until the back cover
 - **Shareable URL** for every book: `/book/<id>`
 - **Embed code** — drop an `<iframe>` of `/embed/<id>` into any website
-- **Library** with first-page thumbnails, copy-link and delete actions
+- **Privacy controls** 🔒 — mark a book **public** or **private**, and/or set a **viewing password**. Enforced on the server: private/protected PDFs are never served (or cached) without access
+- **View analytics** 📊 — per-book views, unique visitors, and a **page-reach funnel** showing exactly where readers drop off (owner-only, privacy-preserving)
+- **Library** with first-page thumbnails, privacy badges, copy-link and delete actions
 - **Viewer toolbar** — first/prev/next/last, jump-to-page, download PDF, fullscreen
 - Mobile-friendly: single-page portrait mode on narrow screens
 
@@ -52,21 +54,34 @@ Without Clerk keys the app runs in open mode (no sign-in, shared library) — ha
 
 | Method | Route | Description |
 | --- | --- | --- |
-| `GET` | `/api/books` | List all books |
-| `POST` | `/api/books` | Upload a PDF (`multipart/form-data`, field `file`, optional `title`) |
-| `GET` | `/api/books/:id` | Book metadata |
-| `PATCH` | `/api/books/:id` | Rename (`{ "title": "..." }`) |
-| `DELETE` | `/api/books/:id` | Delete book + PDF |
-| `GET` | `/api/books/:id/pdf` | The PDF (`?download=1` forces download) |
+| `GET` | `/api/books` | List the caller's books |
+| `POST` | `/api/books` | Register a book (`{ fileName, size, title?, visibility?, password? }`) → returns the upload target |
+| `GET` | `/api/books/:id` | Book metadata + `{ locked, canManage }` (access-gated) |
+| `PATCH` | `/api/books/:id` | Owner: rename / set `visibility` / set·clear `password` |
+| `DELETE` | `/api/books/:id` | Delete book + PDF + events |
+| `GET` | `/api/books/:id/pdf` | The PDF, access-gated (`?download=1` forces download) |
+| `POST` | `/api/books/:id/unlock` | Exchange a password for an access cookie |
+| `POST` | `/api/books/:id/events` | Record a `view`/`page` analytics event |
+| `GET` | `/api/books/:id/analytics` | Owner: aggregated stats (`?pages=N`) |
 
 ### Storage
 
 Two backends, selected automatically:
 
-- **Supabase** (cloud deploys): set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Metadata lives in a `flipbook_books` table, PDFs in a public `flipbook-pdfs` storage bucket. Browsers upload directly to storage (sidestepping serverless body-size limits) and read PDFs from the storage CDN.
+- **Supabase** (cloud deploys): set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, **and `SUPABASE_SERVICE_ROLE_KEY`**. Metadata lives in a `flipbook_books` table (events in `flipbook_events`), PDFs in a **private** `flipbook-pdfs` bucket. The server (holding the service-role key) mints one-time **signed upload URLs** and short-lived **signed download URLs** — the browser never uploads with the anon key, and PDFs are never world-readable. RLS locks anon/authenticated clients out of the tables and storage entirely.
 - **Local filesystem** (default): books under `data/` (override with `FLIPBOOK_DATA_DIR`). Zero config for local dev or a Docker volume.
 
 Uploads are two-step: `POST /api/books` registers the book and returns the upload target; the client then sends the PDF bytes there.
+
+### Security & privacy
+
+- **Access control** — every book is `public` or `private`, optionally with a viewing **password**. The book page, embed, PDF bytes, and analytics beacon are all gated by the same server-side check; passwords are hashed with scrypt and exchanged for a short-lived, httpOnly, HMAC-signed cookie (`/api/books/:id/unlock`). Private/protected responses are sent `no-store`.
+- **No direct storage access** — in Supabase mode the anon key cannot read or write the bucket or tables; all privileged work runs server-side with the service-role key.
+- Set **`FLIPBOOK_SECRET`** in production (`openssl rand -hex 32`) so unlock cookies and unique-visitor counts stay stable across restarts/instances.
+
+### Analytics
+
+The viewer sends anonymous `view` / `page` beacons (`POST /api/books/:id/events`). Owners see aggregated stats at `/book/:id/insights`: total views, unique visitors, a per-page reach funnel, and last-viewed time. Visitors are counted via a one-way hash of network + browser — no personal data is stored.
 
 ## Stack
 

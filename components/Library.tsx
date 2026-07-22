@@ -214,6 +214,22 @@ function BookCard({ book, onDelete }: { book: Book; onDelete: () => void }) {
       <Link href={`/book/${book.id}`} className="block">
         <div className="relative aspect-[3/4] overflow-hidden bg-slate-800">
           <Thumbnail id={book.id} />
+          {(book.visibility === "private" || book.hasPassword) && (
+            <span
+              className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-slate-950/80 px-2 py-1 text-[10px] font-medium text-amber-300 backdrop-blur"
+              title={
+                book.hasPassword
+                  ? "Password protected"
+                  : "Private — only you can open it"
+              }
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              {book.hasPassword ? "Password" : "Private"}
+            </span>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
           <div className="absolute inset-x-0 bottom-3 flex justify-center opacity-0 transition group-hover:opacity-100">
             <span className="rounded-full bg-amber-400 px-4 py-1.5 text-xs font-semibold text-slate-950">

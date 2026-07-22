@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { Visibility } from "@/lib/types";
 
 interface ShareDialogProps {
   open: boolean;
@@ -8,9 +9,25 @@ interface ShareDialogProps {
   title: string;
   shareUrl: string;
   embedUrl?: string;
+  bookId?: string;
+  isOwner?: boolean;
+  visibility?: Visibility;
+  hasPassword?: boolean;
+  onPrivacyChange?: (visibility: Visibility, hasPassword: boolean) => void;
 }
 
-export default function ShareDialog({ open, onClose, title, shareUrl, embedUrl }: ShareDialogProps) {
+export default function ShareDialog({
+  open,
+  onClose,
+  title,
+  shareUrl,
+  embedUrl,
+  bookId,
+  isOwner,
+  visibility = "public",
+  hasPassword = false,
+  onPrivacyChange,
+}: ShareDialogProps) {
   if (!open) return null;
 
   const embedCode = embedUrl
@@ -26,7 +43,7 @@ export default function ShareDialog({ open, onClose, title, shareUrl, embedUrl }
       aria-label={`Share ${title}`}
     >
       <div
-        className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5 flex items-start justify-between">
@@ -50,8 +67,159 @@ export default function ShareDialog({ open, onClose, title, shareUrl, embedUrl }
         {embedCode && (
           <CopyField label="Embed on your website" value={embedCode} multiline />
         )}
+
+        {isOwner && bookId && (
+          <PrivacyPanel
+            bookId={bookId}
+            visibility={visibility}
+            hasPassword={hasPassword}
+            onChange={onPrivacyChange}
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+function PrivacyPanel({
+  bookId,
+  visibility,
+  hasPassword,
+  onChange,
+}: {
+  bookId: string;
+  visibility: Visibility;
+  hasPassword: boolean;
+  onChange?: (visibility: Visibility, hasPassword: boolean) => void;
+}) {
+  const [vis, setVis] = useState<Visibility>(visibility);
+  const [password, setPassword] = useState("");
+  const [clearPassword, setClearPassword] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<"idle" | "saved" | "error">("idle");
+  const [error, setError] = useState("");
+
+  const save = async () => {
+    setSaving(true);
+    setStatus("idle");
+    setError("");
+    const body: Record<string, unknown> = { visibility: vis };
+    if (clearPassword) body.password = null;
+    else if (password) body.password = password;
+
+    try {
+      const res = await fetch(`/api/books/${bookId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || `Save failed (${res.status})`);
+      }
+      const nextHasPassword = clearPassword ? false : password ? true : hasPassword;
+      setStatus("saved");
+      setPassword("");
+      setClearPassword(false);
+      onChange?.(vis, nextHasPassword);
+      setTimeout(() => setStatus("idle"), 2000);
+    } catch (e) {
+      setStatus("error");
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 border-t border-slate-800 pt-5">
+      <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+        Privacy
+      </span>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <VisibilityOption
+          label="Public"
+          hint="Anyone with the link"
+          active={vis === "public"}
+          onClick={() => setVis("public")}
+        />
+        <VisibilityOption
+          label="Private"
+          hint="Only you or with a password"
+          active={vis === "private"}
+          onClick={() => setVis("private")}
+        />
+      </div>
+
+      <div className="mt-4">
+        <label className="text-xs font-medium text-slate-400">
+          {hasPassword ? "Change password" : "Set a viewing password"}{" "}
+          <span className="text-slate-600">(optional)</span>
+        </label>
+        <input
+          type="password"
+          value={password}
+          disabled={clearPassword}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder={hasPassword ? "•••••••• (unchanged)" : "Leave blank for none"}
+          className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60 disabled:opacity-40"
+        />
+        {hasPassword && (
+          <label className="mt-2 flex items-center gap-2 text-xs text-slate-400">
+            <input
+              type="checkbox"
+              checked={clearPassword}
+              onChange={(e) => setClearPassword(e.target.checked)}
+              className="accent-amber-400"
+            />
+            Remove the password
+          </label>
+        )}
+      </div>
+
+      <div className="mt-4 flex items-center justify-between">
+        <span className="text-xs">
+          {status === "saved" && <span className="text-emerald-400">Saved ✓</span>}
+          {status === "error" && <span className="text-red-400">{error}</span>}
+        </span>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="rounded-lg bg-amber-400 px-4 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save privacy"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function VisibilityOption({
+  label,
+  hint,
+  active,
+  onClick,
+}: {
+  label: string;
+  hint: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-xl border px-3 py-2.5 text-left transition ${
+        active
+          ? "border-amber-400 bg-amber-400/10"
+          : "border-slate-700 bg-slate-950 hover:border-slate-600"
+      }`}
+    >
+      <span className={`block text-sm font-medium ${active ? "text-amber-300" : "text-white"}`}>
+        {label}
+      </span>
+      <span className="mt-0.5 block text-xs text-slate-500">{hint}</span>
+    </button>
   );
 }
 

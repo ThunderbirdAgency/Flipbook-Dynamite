@@ -2,12 +2,25 @@
 
 import { useSyncExternalStore } from "react";
 import FlipbookViewer from "@/components/FlipbookViewer";
+import type { Visibility } from "@/lib/types";
 
 const noopSubscribe = () => () => {};
 
 // Share/embed URLs need window.location.origin, which only exists client-side,
 // so this thin wrapper computes them and feeds the viewer.
-export default function BookViewer({ id, title }: { id: string; title: string }) {
+export default function BookViewer({
+  id,
+  title,
+  isOwner,
+  visibility,
+  hasPassword,
+}: {
+  id: string;
+  title: string;
+  isOwner: boolean;
+  visibility: Visibility;
+  hasPassword: boolean;
+}) {
   const origin = useSyncExternalStore(
     noopSubscribe,
     () => window.location.origin,
@@ -21,6 +34,10 @@ export default function BookViewer({ id, title }: { id: string; title: string })
       downloadUrl={`/api/books/${id}/pdf?download=1`}
       shareUrl={origin ? `${origin}/book/${id}` : undefined}
       embedUrl={origin ? `${origin}/embed/${id}` : undefined}
+      bookId={id}
+      isOwner={isOwner}
+      visibility={visibility}
+      hasPassword={hasPassword}
     />
   );
 }

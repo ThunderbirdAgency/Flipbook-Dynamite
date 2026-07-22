@@ -118,11 +118,27 @@ npm run lint
 4. **Logo** — owner has a brand logo to replace the placeholder SVG in `app/page.tsx` /
    `app/book/[id]/page.tsx` + favicon.
 
-## Hardening / known gaps (v1 tradeoffs, roughly in priority order)
+## Access control, security & analytics (added 2026-07-22)
 
-- The Supabase **anon key can write** to the bucket/table directly (policies are permissive;
-  the app API enforces auth above it). Fix: switch writes to server-issued signed upload URLs
-  with a service-role key held only in Vercel env, and tighten RLS.
+- **Privacy per book** — `visibility` (`public`/`private`) + optional scrypt-hashed **password**.
+  Gate logic lives in `lib/access.ts` (`decideAccess`) and `lib/gate.ts`; it guards the book
+  page, embed, `GET /pdf`, and the analytics beacon. Unlock flow: `POST /api/books/:id/unlock`
+  verifies the password and sets a short-lived, httpOnly, HMAC-signed cookie (`fb_acc_<id>`).
+  `canManage` (owner in auth mode; everyone in open mode) drives the owner UI; **viewing** is
+  always strictly gated (open mode does *not* bypass passwords).
+- **Signed storage** — `SUPABASE_SERVICE_ROLE_KEY` (server-only) now issues one-time **signed
+  upload URLs** and short-lived **signed download URLs** against a **private** bucket. The anon
+  key can no longer touch storage or the tables. Applied via Supabase migration
+  `flipbook_access_control_and_hardening` (adds `visibility` + `password_hash`, creates
+  `flipbook_events`, drops all permissive anon/authenticated policies, sets the bucket private).
+- **Analytics** — viewer beacons (`POST /api/books/:id/events`) feed owner insights at
+  `/book/:id/insights` (`GET /api/books/:id/analytics`): views, unique visitors, page-reach
+  funnel. Visitors are an HMAC of IP+UA — no PII stored.
+- **Required env now:** `SUPABASE_SERVICE_ROLE_KEY` (Supabase mode) and `FLIPBOOK_SECRET`
+  (stable cookie/visitor signing) — see `.env.example`. Set both in Vercel before deploying.
+
+## Hardening / known gaps (roughly in priority order)
+
 - `books.json` fs-mode writes aren't concurrency-safe under heavy parallel use (fine for dev).
 - No pagination on the library, no rate limiting, no upload virus scanning.
 - Rendering is fully client-side; very large PDFs (100+ pages) are memory-hungry on weak
