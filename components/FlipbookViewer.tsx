@@ -9,6 +9,7 @@ import BrandingDialog from "@/components/BrandingDialog";
 import ZoomOverlay from "@/components/ZoomOverlay";
 import ThumbnailStrip from "@/components/ThumbnailStrip";
 import TocPanel from "@/components/TocPanel";
+import SearchPanel from "@/components/SearchPanel";
 
 import type { Branding, Visibility } from "@/lib/types";
 
@@ -54,6 +55,8 @@ export default function FlipbookViewer({
     : brand.bgColor || null;
   const [pages, setPages] = useState<RenderedPage[] | null>(null);
   const [outline, setOutline] = useState<OutlineItem[]>([]);
+  const [pageTexts, setPageTexts] = useState<string[]>([]);
+  const [showSearch, setShowSearch] = useState(false);
   const [status, setStatus] = useState<Status>("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -143,6 +146,7 @@ export default function FlipbookViewer({
         if (result.pages.length === 0) throw new Error("The PDF has no pages.");
         setPages(result.pages);
         setOutline(result.outline);
+        setPageTexts(result.pageTexts);
         setStatus("ready");
       })
       .catch((err) => {
@@ -282,7 +286,7 @@ export default function FlipbookViewer({
     >
       {/* Stage */}
       <div
-        className={`flipbook-env relative flex-1 overflow-hidden px-4 pt-4 pb-20 sm:px-10 ${showThumbs ? "pl-36 sm:pl-44" : ""} ${showToc ? "pr-72" : ""}`}
+        className={`flipbook-env relative flex-1 overflow-hidden px-4 pt-4 pb-20 sm:px-10 ${showThumbs ? "pl-36 sm:pl-44" : ""} ${showToc || showSearch ? "pr-80" : ""}`}
         data-bg={customBg ? "custom" : undefined}
         style={customBg ? ({ ["--fb-bg" as string]: customBg } as React.CSSProperties) : undefined}
       >
@@ -392,6 +396,13 @@ export default function FlipbookViewer({
           onClose={() => setShowToc(false)}
         />
       )}
+      {status === "ready" && showSearch && (
+        <SearchPanel
+          pageTexts={pageTexts}
+          onSelect={(p) => goToPage(p)}
+          onClose={() => setShowSearch(false)}
+        />
+      )}
 
       {/* Toolbar */}
       {status === "ready" && (
@@ -408,11 +419,24 @@ export default function FlipbookViewer({
               <ToolbarButton
                 label="Table of contents"
                 active={showToc}
-                onClick={() => setShowToc((v) => !v)}
+                onClick={() => {
+                  setShowSearch(false);
+                  setShowToc((v) => !v);
+                }}
               >
                 <TocIcon />
               </ToolbarButton>
             )}
+            <ToolbarButton
+              label="Search inside"
+              active={showSearch}
+              onClick={() => {
+                setShowToc(false);
+                setShowSearch((v) => !v);
+              }}
+            >
+              <SearchIcon />
+            </ToolbarButton>
 
             <div className="mx-1 h-5 w-px bg-slate-700" />
 
@@ -723,6 +747,15 @@ function SoundIcon({ muted }: { muted: boolean }) {
           <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
         </>
       )}
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
   );
 }

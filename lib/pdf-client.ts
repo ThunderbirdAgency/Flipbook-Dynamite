@@ -30,6 +30,8 @@ export interface OutlineItem {
 export interface RenderedPdf {
   pages: RenderedPage[];
   outline: OutlineItem[];
+  /** Plain text of each page (index-aligned with `pages`), for full-text search. */
+  pageTexts: string[];
 }
 
 // The "legacy" build ships transpiled + polyfilled code; the modern build
@@ -61,6 +63,7 @@ export async function renderPdfToPages(
   const task = pdfjs.getDocument({ url: pdfUrl });
   const doc = await task.promise;
   const pages: RenderedPage[] = [];
+  const pageTexts: string[] = [];
   let outline: OutlineItem[] = [];
 
   try {
@@ -88,6 +91,21 @@ export async function renderPdfToPages(
 
       const links = await extractLinks(doc, page, viewport);
 
+      // Text layer for full-text search (no rendering cost worth worrying about).
+      let text = "";
+      try {
+        const tc = await page.getTextContent();
+        text = tc.items
+          .map((it) => ("str" in it ? (it as { str: string }).str : ""))
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 20000);
+      } catch {
+        // some PDFs have no text layer — search just won't match that page
+      }
+      pageTexts.push(text);
+
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob(resolve, "image/jpeg", 0.88)
       );
@@ -110,9 +128,9 @@ export async function renderPdfToPages(
 
   if (signal?.cancelled) {
     pages.forEach((p) => URL.revokeObjectURL(p.objectUrl));
-    return { pages: [], outline: [] };
+    return { pages: [], outline: [], pageTexts: [] };
   }
-  return { pages, outline };
+  return { pages, outline, pageTexts };
 }
 
 /** Flatten the PDF's bookmark tree into a list with depth markers. */

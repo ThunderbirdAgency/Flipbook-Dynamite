@@ -9,6 +9,7 @@ Turn any PDF into an interactive page-flipping book — with realistic flip anim
 - **Page-flip sound** 🔊 — synthesized paper swish on every turn (mutable, remembered per browser)
 - **Clickable links preserved** — external URLs in the PDF open in a new tab; internal links (table of contents, cross-references) flip to the right page
 - **Thumbnail strip** — jump to any page from a sidebar of page previews
+- **Full-text search** 🔎 — search inside the book; results show the page + a highlighted snippet and jump straight there (extracted from the PDF's text layer)
 - **Table of contents** — built automatically from the PDF's bookmarks/outline
 - **Zoom** — pan, scroll-wheel zoom, and page-through at up to 500%
 - **Autoplay** — hands-free page turning until the back cover
