@@ -13,9 +13,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const book = await getBook(id);
   if (!book) return { title: "Not found — Flipbook Dynamite" };
   const priv = book.visibility === "private" || book.hasPassword;
+  const b = book.branding ?? {};
+  const title = b.seoTitle || `${book.title} — Flipbook Dynamite`;
+  const description = b.seoDescription || `Read “${book.title}” as an interactive flipbook.`;
   return {
-    title: `${book.title} — Flipbook Dynamite`,
-    description: `Read “${book.title}” as an interactive flipbook.`,
+    title,
+    description,
+    openGraph: { title, description, type: "article" },
+    twitter: { card: "summary", title, description },
     // Keep private/protected books out of search engines.
     robots: priv ? { index: false, follow: false } : undefined,
   };
@@ -58,6 +63,7 @@ export default async function BookPage({ params }: Props) {
             isOwner={canManage}
             visibility={book.visibility}
             hasPassword={book.hasPassword}
+            branding={book.branding ?? {}}
           />
         ) : decision === "needs-password" ? (
           <UnlockGate id={book.id} title={book.title} />

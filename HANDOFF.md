@@ -137,6 +137,24 @@ npm run lint
 - **Required env now:** `SUPABASE_SERVICE_ROLE_KEY` (Supabase mode) and `FLIPBOOK_SECRET`
   (stable cookie/visitor signing) — see `.env.example`. Set both in Vercel before deploying.
 
+## Premium viewer + branding (added 2026-08-31)
+
+- **3D look** — `FlipbookViewer` now renders a two-page spread on desktop (single page
+  on phones, re-inits StPageFlip across the 900px breakpoint). `app/globals.css` carries the
+  depth system: spine/gutter shading via StPageFlip's `--left`/`--right` classes, fore-edge
+  page-thickness shadows, a lit studio environment, a contact shadow, paper sheen, and richer
+  hard covers. Verified with headless-Chromium screenshots.
+- **Branding** — `Branding` on the `Book` model (`branding` jsonb column; migration
+  `flipbook_branding`): bg color/image, accent, logo + link, SEO title/description, download
+  toggle. Edited via the owner-only "Customize" dialog (`components/BrandingDialog.tsx`),
+  merged/validated in `lib/branding.ts`, applied in the viewer + embed, and SEO fields feed
+  `generateMetadata`. Logos/backgrounds live in a **public** `flipbook-assets` bucket (writes
+  via service role); served through `/api/books/[id]/asset/[kind]` (fs streams; Supabase
+  redirects to the public CDN URL).
+- **Still open (roadmap):** full-text search + SEO body text + per-book OG image; the
+  interactive enrichment editor (video/GIF/iframe/movable hotspots); social/QR share + lead
+  capture + bookshelf. See the competitive audit for priorities.
+
 ## Hardening / known gaps (roughly in priority order)
 
 - `books.json` fs-mode writes aren't concurrency-safe under heavy parallel use (fine for dev).

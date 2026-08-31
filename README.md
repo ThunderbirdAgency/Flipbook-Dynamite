@@ -14,6 +14,7 @@ Turn any PDF into an interactive page-flipping book — with realistic flip anim
 - **Autoplay** — hands-free page turning until the back cover
 - **Shareable URL** for every book: `/book/<id>`
 - **Embed code** — drop an `<iframe>` of `/embed/<id>` into any website
+- **Branding / white-label** 🎨 — per-book **custom background** (color or uploaded image), **clickable logo** bottom-left, **accent color**, **SEO title/description**, and a download on/off toggle. Applies to the full viewer and the iframe embed
 - **Privacy controls** 🔒 — mark a book **public** or **private**, and/or set a **viewing password**. Enforced on the server: private/protected PDFs are never served (or cached) without access
 - **View analytics** 📊 — per-book views, unique visitors, and a **page-reach funnel** showing exactly where readers drop off (owner-only, privacy-preserving)
 - **Library** with first-page thumbnails, privacy badges, copy-link and delete actions

@@ -5,11 +5,12 @@ import type { PageFlip } from "page-flip";
 import { renderPdfToPages, OutlineItem, RenderedPage } from "@/lib/pdf-client";
 import { playFlipSound } from "@/lib/flip-sound";
 import ShareDialog from "@/components/ShareDialog";
+import BrandingDialog from "@/components/BrandingDialog";
 import ZoomOverlay from "@/components/ZoomOverlay";
 import ThumbnailStrip from "@/components/ThumbnailStrip";
 import TocPanel from "@/components/TocPanel";
 
-import type { Visibility } from "@/lib/types";
+import type { Branding, Visibility } from "@/lib/types";
 
 interface FlipbookViewerProps {
   pdfUrl: string;
@@ -23,6 +24,8 @@ interface FlipbookViewerProps {
   isOwner?: boolean;
   visibility?: Visibility;
   hasPassword?: boolean;
+  /** Per-book branding: background, logo, accent, download toggle. */
+  branding?: Branding;
 }
 
 type Status = "loading" | "ready" | "error";
@@ -39,7 +42,16 @@ export default function FlipbookViewer({
   isOwner,
   visibility = "public",
   hasPassword = false,
+  branding = {},
 }: FlipbookViewerProps) {
+  // Held in state so the owner's branding edits reflect live in the viewer.
+  const [brand, setBrand] = useState<Branding>(branding);
+  const [brandOpen, setBrandOpen] = useState(false);
+  const accent = brand.accent || "#fbbf24";
+  const showDownload = brand.allowDownload !== false && Boolean(downloadUrl);
+  const customBg = brand.bgImageUrl
+    ? `center / cover no-repeat url("${brand.bgImageUrl}")`
+    : brand.bgColor || null;
   const [pages, setPages] = useState<RenderedPage[] | null>(null);
   const [outline, setOutline] = useState<OutlineItem[]>([]);
   const [status, setStatus] = useState<Status>("loading");
@@ -266,10 +278,13 @@ export default function FlipbookViewer({
     <div
       ref={containerRef}
       className="relative flex h-full w-full flex-col overflow-hidden bg-slate-950"
+      style={{ ["--fb-accent" as string]: accent } as React.CSSProperties}
     >
       {/* Stage */}
       <div
         className={`flipbook-env relative flex-1 overflow-hidden px-4 pt-4 pb-20 sm:px-10 ${showThumbs ? "pl-36 sm:pl-44" : ""} ${showToc ? "pr-72" : ""}`}
+        data-bg={customBg ? "custom" : undefined}
+        style={customBg ? ({ ["--fb-bg" as string]: customBg } as React.CSSProperties) : undefined}
       >
         {status === "loading" && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 text-slate-300">
@@ -444,6 +459,11 @@ export default function FlipbookViewer({
               </ToolbarButton>
             )}
             {isOwner && bookId && (
+              <ToolbarButton label="Customize / branding" onClick={() => setBrandOpen(true)}>
+                <BrushIcon />
+              </ToolbarButton>
+            )}
+            {isOwner && bookId && (
               <a
                 href={`/book/${bookId}/insights`}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-700/70 hover:text-white"
@@ -453,7 +473,7 @@ export default function FlipbookViewer({
                 <InsightsIcon />
               </a>
             )}
-            {downloadUrl && (
+            {showDownload && (
               <a
                 href={downloadUrl}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-700/70 hover:text-white"
@@ -473,6 +493,34 @@ export default function FlipbookViewer({
         </div>
       )}
 
+      {/* Custom logo, bottom-left (branding) */}
+      {brand.logoUrl && (
+        <div className="pointer-events-none absolute bottom-4 left-4 z-20">
+          {brand.logoLink ? (
+            <a
+              href={brand.logoLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pointer-events-auto block"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={brand.logoUrl}
+                alt="Logo"
+                className="h-9 w-auto max-w-[170px] object-contain drop-shadow-lg sm:h-11"
+              />
+            </a>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={brand.logoUrl}
+              alt="Logo"
+              className="h-9 w-auto max-w-[170px] object-contain drop-shadow-lg sm:h-11"
+            />
+          )}
+        </div>
+      )}
+
       {shareUrl && (
         <ShareDialog
           open={shareOpen}
@@ -488,6 +536,16 @@ export default function FlipbookViewer({
             setBookVisibility(v);
             setBookHasPassword(hp);
           }}
+        />
+      )}
+
+      {isOwner && bookId && (
+        <BrandingDialog
+          open={brandOpen}
+          onClose={() => setBrandOpen(false)}
+          bookId={bookId}
+          branding={brand}
+          onChange={setBrand}
         />
       )}
 
@@ -569,9 +627,10 @@ function ToolbarButton({
       onClick={onClick}
       className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
         active
-          ? "bg-amber-400 text-slate-950 hover:bg-amber-300"
+          ? "text-slate-950"
           : "text-slate-300 hover:bg-slate-700/70 hover:text-white"
       }`}
+      style={active ? { background: "var(--fb-accent, #fbbf24)" } : undefined}
       title={label}
       aria-label={label}
     >
@@ -664,6 +723,15 @@ function SoundIcon({ muted }: { muted: boolean }) {
           <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
         </>
       )}
+    </svg>
+  );
+}
+
+function BrushIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08" />
+      <path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z" />
     </svg>
   );
 }

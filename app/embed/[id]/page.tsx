@@ -31,6 +31,7 @@ export default async function EmbedPage({ params }: Props) {
           bookId={id}
           visibility={book.visibility}
           hasPassword={book.hasPassword}
+          branding={book.branding ?? {}}
         />
       ) : decision === "needs-password" ? (
         <UnlockGate id={book.id} title={book.title} />

@@ -1,5 +1,25 @@
 export type Visibility = "public" | "private";
 
+/** Per-book branding / white-label settings. All fields optional. */
+export interface Branding {
+  /** Stage background color (any CSS color). */
+  bgColor?: string;
+  /** Stage background image URL (served publicly; shown behind the book). */
+  bgImageUrl?: string;
+  /** Accent color (hex) for toolbar highlights + active states. */
+  accent?: string;
+  /** Logo image URL, shown bottom-left of the viewer. */
+  logoUrl?: string;
+  /** Optional click-through URL for the logo. */
+  logoLink?: string;
+  /** Overrides the page <title> for SEO. */
+  seoTitle?: string;
+  /** Overrides the meta description for SEO. */
+  seoDescription?: string;
+  /** Whether the viewer shows the download button (default true). */
+  allowDownload?: boolean;
+}
+
 export interface Book {
   id: string;
   title: string;
@@ -15,6 +35,8 @@ export interface Book {
   visibility: Visibility;
   /** Whether a viewing password is set. The hash itself never leaves the server. */
   hasPassword: boolean;
+  /** Branding / white-label settings (safe to expose). */
+  branding: Branding;
 }
 
 /**
@@ -37,6 +59,7 @@ export function toPublicBook(book: StoredBook): Book {
     ownerId: book.ownerId,
     visibility: book.visibility,
     hasPassword: book.hasPassword,
+    branding: book.branding ?? {},
   };
 }
 

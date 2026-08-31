@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
     visibility,
     hasPassword: Boolean(password),
     passwordHash: password ? hashPassword(password) : null,
+    branding: {},
   };
 
   await createBook(book);

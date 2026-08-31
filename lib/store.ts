@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { BookEvent, BookStats, StoredBook, Visibility } from "./types";
+import { Branding, BookEvent, BookStats, StoredBook, Visibility } from "./types";
 
 // Two storage backends behind one API:
 //  - Supabase (Postgres + Storage) when NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY are
@@ -29,6 +29,7 @@ const PRIVILEGED_KEY = SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY;
 const TABLE = "flipbook_books";
 const EVENTS_TABLE = "flipbook_events";
 const BUCKET = "flipbook-pdfs";
+const ASSETS_BUCKET = "flipbook-assets";
 
 export const MAX_PDF_SIZE = 100 * 1024 * 1024; // 100 MB
 const SIGNED_DOWNLOAD_TTL = 60 * 30; // 30 min — long enough to render big PDFs
@@ -54,6 +55,7 @@ interface BookRow {
   owner_id: string | null;
   visibility: string | null;
   password_hash: string | null;
+  branding: Branding | null;
 }
 
 function rowToBook(row: BookRow): StoredBook {
@@ -67,6 +69,7 @@ function rowToBook(row: BookRow): StoredBook {
     visibility: (row.visibility as Visibility) === "private" ? "private" : "public",
     hasPassword: Boolean(row.password_hash),
     passwordHash: row.password_hash ?? null,
+    branding: row.branding ?? {},
   };
 }
 
@@ -87,7 +90,7 @@ async function sbRest(pathAndQuery: string, init?: RequestInit): Promise<Respons
 }
 
 const BOOK_COLS =
-  "id,title,file_name,size,created_at,owner_id,visibility,password_hash";
+  "id,title,file_name,size,created_at,owner_id,visibility,password_hash,branding";
 
 async function sbList(ownerId?: string): Promise<StoredBook[]> {
   const filter = ownerId ? `&owner_id=eq.${encodeURIComponent(ownerId)}` : "";
@@ -121,6 +124,7 @@ async function sbCreate(book: StoredBook): Promise<StoredBook> {
       owner_id: book.ownerId ?? null,
       visibility: book.visibility,
       password_hash: book.passwordHash,
+      branding: book.branding ?? {},
     }),
   });
   if (!res.ok) throw new Error(`Supabase insert failed (${res.status})`);
@@ -132,6 +136,7 @@ async function sbUpdate(id: string, patch: BookPatch): Promise<StoredBook | null
   if (patch.title !== undefined) body.title = patch.title;
   if (patch.visibility !== undefined) body.visibility = patch.visibility;
   if (patch.passwordHash !== undefined) body.password_hash = patch.passwordHash;
+  if (patch.branding !== undefined) body.branding = patch.branding;
   const res = await sbRest(`${TABLE}?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { Prefer: "return=representation" },
@@ -157,6 +162,12 @@ async function sbDelete(id: string): Promise<boolean> {
   await sbRest(`${EVENTS_TABLE}?book_id=eq.${encodeURIComponent(id)}`, {
     method: "DELETE",
   }).catch(() => {});
+  for (const kind of ["logo", "background"] as const) {
+    await fetch(`${SUPABASE_URL}/storage/v1/object/${ASSETS_BUCKET}/${id}/${kind}`, {
+      method: "DELETE",
+      headers: sbHeaders(),
+    }).catch(() => {});
+  }
   return true;
 }
 
@@ -165,6 +176,7 @@ async function sbDelete(id: string): Promise<boolean> {
 const DATA_DIR = process.env.FLIPBOOK_DATA_DIR || path.join(process.cwd(), "data");
 const PDF_DIR = path.join(DATA_DIR, "pdfs");
 const EVENTS_DIR = path.join(DATA_DIR, "events");
+const ASSETS_DIR = path.join(DATA_DIR, "assets");
 const INDEX_FILE = path.join(DATA_DIR, "books.json");
 
 async function ensureDirs() {
@@ -186,6 +198,7 @@ async function readIndex(): Promise<StoredBook[]> {
       visibility: b.visibility === "private" ? "private" : "public",
       hasPassword: Boolean(b.passwordHash),
       passwordHash: b.passwordHash ?? null,
+      branding: b.branding ?? {},
     }));
   } catch {
     return [];
@@ -211,6 +224,8 @@ export interface BookPatch {
   visibility?: Visibility;
   /** null clears the password, a string sets a new hash, undefined leaves it. */
   passwordHash?: string | null;
+  /** Full replacement of the branding object (already merged by the caller). */
+  branding?: Branding;
 }
 
 export function assertValidId(id: string) {
@@ -255,6 +270,7 @@ export async function updateBook(
     clean.visibility = patch.visibility;
   }
   if (patch.passwordHash !== undefined) clean.passwordHash = patch.passwordHash;
+  if (patch.branding !== undefined) clean.branding = patch.branding;
   if (Object.keys(clean).length === 0) return getBook(id);
 
   if (supabaseMode) return sbUpdate(id, clean);
@@ -267,6 +283,7 @@ export async function updateBook(
     book.passwordHash = clean.passwordHash;
     book.hasPassword = Boolean(clean.passwordHash);
   }
+  if (clean.branding !== undefined) book.branding = clean.branding;
   await writeIndex(books);
   return book;
 }
@@ -281,6 +298,8 @@ export async function deleteBook(id: string): Promise<boolean> {
   await writeIndex(books);
   await fs.unlink(fsPdfPath(id)).catch(() => {});
   await fs.unlink(path.join(EVENTS_DIR, `${id}.jsonl`)).catch(() => {});
+  await fs.unlink(path.join(ASSETS_DIR, `${id}-logo`)).catch(() => {});
+  await fs.unlink(path.join(ASSETS_DIR, `${id}-background`)).catch(() => {});
   return true;
 }
 
@@ -363,6 +382,57 @@ export async function getPdfDelivery(
 export async function savePdfBuffer(id: string, pdf: Buffer): Promise<void> {
   await ensureDirs();
   await fs.writeFile(fsPdfPath(id), pdf);
+}
+
+/* ---------------- Branding assets (logo / background image) ---------------- */
+
+export type AssetKind = "logo" | "background";
+
+/** Persist a branding image and return the (stable) URL to reference it by. */
+export async function saveAsset(
+  id: string,
+  kind: AssetKind,
+  buf: Buffer,
+  contentType: string
+): Promise<string> {
+  assertValidId(id);
+  if (supabaseMode) {
+    const res = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/${ASSETS_BUCKET}/${id}/${kind}`,
+      {
+        method: "POST",
+        headers: sbHeaders({ "Content-Type": contentType, "x-upsert": "true" }),
+        body: new Uint8Array(buf),
+      }
+    );
+    if (!res.ok) throw new Error(`Asset upload failed (${res.status})`);
+  } else {
+    await fs.mkdir(ASSETS_DIR, { recursive: true });
+    await fs.writeFile(path.join(ASSETS_DIR, `${id}-${kind}`), buf);
+  }
+  // Backend-agnostic, cache-busted URL served by our own route.
+  return `/api/books/${id}/asset/${kind}?v=${Date.now()}`;
+}
+
+/** How to deliver a branding image for the public GET route. */
+export async function getAssetDelivery(
+  id: string,
+  kind: AssetKind
+): Promise<PdfDelivery | null> {
+  assertValidId(id);
+  if (supabaseMode) {
+    return {
+      kind: "redirect",
+      url: `${SUPABASE_URL}/storage/v1/object/public/${ASSETS_BUCKET}/${id}/${kind}`,
+    };
+  }
+  const p = path.join(ASSETS_DIR, `${id}-${kind}`);
+  try {
+    await fs.access(p);
+  } catch {
+    return null;
+  }
+  return { kind: "file", path: p };
 }
 
 /* ---------------- Analytics ---------------- */
