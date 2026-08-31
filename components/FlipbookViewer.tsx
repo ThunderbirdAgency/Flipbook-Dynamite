@@ -55,6 +55,23 @@ export default function FlipbookViewer({
   const [muted, setMuted] = useState(
     () => typeof window !== "undefined" && localStorage.getItem("fbd-muted") === "1"
   );
+  // Two-page spread on desktop, single page on phones — the spread is what
+  // reads as a real bound book. Re-init the engine when we cross the breakpoint.
+  const [portrait, setPortrait] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 900
+  );
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout>;
+    const onResize = () => {
+      clearTimeout(t);
+      t = setTimeout(() => setPortrait(window.innerWidth < 900), 200);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<HTMLDivElement>(null);
@@ -149,13 +166,15 @@ export default function FlipbookViewer({
         minHeight: 220,
         maxHeight: 3000,
         showCover: true,
-        usePortrait: true,
+        usePortrait: portrait,
         autoSize: true,
-        maxShadowOpacity: 0.4,
+        // Deeper fold shadows + a weightier turn read as a heavier, realer book.
+        drawShadow: true,
+        maxShadowOpacity: 0.65,
         mobileScrollSupport: false,
         clickEventForward: true,
         showPageCorners: true,
-        flippingTime: 650,
+        flippingTime: 800,
       });
       flip.loadFromHTML(bookRef.current.querySelectorAll(".fb-page"));
       flip.on("flip", (e) => {
@@ -180,7 +199,7 @@ export default function FlipbookViewer({
         // PageFlip.destroy throws if it never finished mounting; safe to ignore.
       }
     };
-  }, [pages]);
+  }, [pages, portrait]);
 
   // Keyboard navigation.
   useEffect(() => {
@@ -250,7 +269,7 @@ export default function FlipbookViewer({
     >
       {/* Stage */}
       <div
-        className={`relative flex-1 overflow-hidden px-4 pt-4 pb-20 sm:px-10 ${showThumbs ? "pl-36 sm:pl-44" : ""} ${showToc ? "pr-72" : ""}`}
+        className={`flipbook-env relative flex-1 overflow-hidden px-4 pt-4 pb-20 sm:px-10 ${showThumbs ? "pl-36 sm:pl-44" : ""} ${showToc ? "pr-72" : ""}`}
       >
         {status === "loading" && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 text-slate-300">
@@ -279,7 +298,8 @@ export default function FlipbookViewer({
         )}
 
         {pages && (
-          <div className="mx-auto flex h-full max-w-6xl items-center justify-center">
+          <div className="flipbook-book relative mx-auto flex h-full max-w-6xl items-center justify-center">
+            <div className="flipbook-shadow" aria-hidden="true" />
             <div ref={bookRef} className="flipbook-stage w-full">
               {pages.map((page, i) => (
                 <div

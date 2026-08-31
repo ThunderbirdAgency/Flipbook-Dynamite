@@ -25,18 +25,72 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* ---------- Flipbook (StPageFlip) ---------- */
+/* ---------- Flipbook (StPageFlip) — premium 3D presentation ---------- */
+
+/* The "environment": a lit stage so the book sits in a space rather than
+   floating on a flat panel. A warm key light up top, cool fill, and a vignette
+   pooling into a soft floor give the book somewhere to cast its shadow. */
+.flipbook-env {
+  position: relative;
+  isolation: isolate;
+  /* A graphite studio sweep: a warm key light pooling behind the book, a cool
+     floor gradient, and a vignette — so the book is spotlit, not floating on a
+     flat slab. Overrides the viewer's near-black panel. */
+  background:
+    radial-gradient(120% 80% at 50% -5%, rgba(255, 241, 219, 0.12), transparent 52%),
+    radial-gradient(85% 55% at 50% 120%, rgba(0, 0, 0, 0.6), transparent 72%),
+    radial-gradient(150% 120% at 50% 38%, #2a2f3a 0%, #1b1f27 42%, #0d1016 100%);
+}
+/* A book's own branding background (set later) sits above this default. */
+.flipbook-env[data-bg="custom"] {
+  background: var(--fb-bg, #0d1016);
+  background-size: cover;
+  background-position: center;
+}
+
+/* Perspective on the book wrapper deepens StPageFlip's fold during a turn. */
+.flipbook-book {
+  perspective: 2400px;
+  perspective-origin: 50% 42%;
+}
+
+/* Soft contact shadow anchored to the floor of the stage — the single biggest
+   cue that the book is a real object resting in the scene. */
+.flipbook-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: 5%;
+  width: min(74%, 860px);
+  height: 34px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.34) 52%, transparent 80%);
+  filter: blur(12px);
+  z-index: 0;
+  pointer-events: none;
+}
 
 /* Hide raw pages until PageFlip adopts them into its own DOM — prevents a
    flash of all pages stacked on first paint. */
 .flipbook-stage > .fb-page {
   display: none;
 }
+.flipbook-stage {
+  position: relative;
+  z-index: 1;
+}
 
+/* A single soft page. Layered shadows give it lift (outer), grounding (drop),
+   and a faint edge so the paper has thickness rather than reading as a decal. */
 .fb-page {
+  position: relative;
   background: #ffffff;
   overflow: hidden;
-  box-shadow: 0 0 6px rgba(0, 0, 0, 0.25);
+  border-radius: 1px;
+  box-shadow:
+    0 22px 45px -18px rgba(0, 0, 0, 0.65),
+    0 6px 14px -6px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.04);
 }
 
 .fb-page img {
@@ -48,14 +102,97 @@ body {
   -webkit-user-drag: none;
 }
 
-/* Hard cover pages get a subtle edge */
-.fb-page[data-density="hard"] {
-  border-radius: 2px;
+/* Paper cues, painted over the page image but under the hotspots:
+   - a diagonal sheen (raking light across the sheet)
+   - a gutter gradient that darkens toward the binding so the sheet looks like
+     it curves into the spine instead of lying dead flat. */
+.fb-page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(105deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 22%, rgba(255, 255, 255, 0) 78%, rgba(0, 0, 0, 0.05) 100%),
+    linear-gradient(to right, rgba(0, 0, 0, 0.10), rgba(0, 0, 0, 0) 7%, rgba(0, 0, 0, 0) 93%, rgba(0, 0, 0, 0.10) 100%);
+  mix-blend-mode: multiply;
+  opacity: 0.9;
 }
 
-/* Clickable hotspots from the PDF's link annotations */
+/* Hard cover / back pages: thicker feel, a rounded outer corner, and a subtle
+   sheen so covers read as a stiffer, glossier stock than the inner sheets. */
+.fb-page[data-density="hard"] {
+  border-radius: 3px 5px 5px 3px;
+  box-shadow:
+    0 30px 60px -20px rgba(0, 0, 0, 0.75),
+    0 10px 20px -8px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+.fb-page[data-density="hard"]::after {
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 30%, rgba(0, 0, 0, 0.08) 100%),
+    linear-gradient(to right, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0) 9%);
+}
+
+/* Gutter / spine shading. StPageFlip tags each visible sheet with `--left` or
+   `--right`; a real bound book darkens and curves into the binding, so we shade
+   each sheet toward its inner (spine) edge. This is the cue that fuses two
+   pages into one book instead of two floating cards. */
+.fb-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+}
+.fb-page[class~="--left"]::before {
+  opacity: 1;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(0, 0, 0, 0) 55%,
+    rgba(0, 0, 0, 0.06) 88%,
+    rgba(0, 0, 0, 0.22) 100%
+  );
+}
+.fb-page[class~="--right"]::before {
+  opacity: 1;
+  background: linear-gradient(
+    to left,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(0, 0, 0, 0) 55%,
+    rgba(0, 0, 0, 0.06) 88%,
+    rgba(0, 0, 0, 0.22) 100%
+  );
+}
+
+/* Page-block thickness on the OUTER fore-edges — a little stack of cream paper
+   leaves so the book has heft rather than being one sheet thin. */
+.fb-page[class~="--left"] {
+  box-shadow:
+    0 22px 45px -18px rgba(0, 0, 0, 0.65),
+    0 6px 14px -6px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.04),
+    -2px 0 0 rgba(244, 240, 231, 0.9),
+    -4px 0 0 rgba(232, 226, 213, 0.85),
+    -6px 1px 0 rgba(219, 211, 194, 0.8),
+    -8px 2px 4px rgba(0, 0, 0, 0.25);
+}
+.fb-page[class~="--right"] {
+  box-shadow:
+    0 22px 45px -18px rgba(0, 0, 0, 0.65),
+    0 6px 14px -6px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.04),
+    2px 0 0 rgba(244, 240, 231, 0.9),
+    4px 0 0 rgba(232, 226, 213, 0.85),
+    6px 1px 0 rgba(219, 211, 194, 0.8),
+    8px 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+/* Clickable hotspots from the PDF's link annotations (sit above paper cues). */
 .fb-link {
   position: absolute;
+  z-index: 2;
   display: block;
   cursor: pointer;
   border-radius: 2px;
