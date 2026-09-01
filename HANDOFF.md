@@ -151,9 +151,24 @@ npm run lint
   `generateMetadata`. Logos/backgrounds live in a **public** `flipbook-assets` bucket (writes
   via service role); served through `/api/books/[id]/asset/[kind]` (fs streams; Supabase
   redirects to the public CDN URL).
-- **Still open (roadmap):** full-text search + SEO body text + per-book OG image; the
-  interactive enrichment editor (video/GIF/iframe/movable hotspots); social/QR share + lead
-  capture + bookshelf. See the competitive audit for priorities.
+## Search, enrichment & sharing (added 2026-09-01)
+
+- **Full-text search** — page text is extracted during render (`lib/pdf-client.ts`
+  `getTextContent`) and searched in `components/SearchPanel.tsx` (highlighted snippets,
+  jump-to-page).
+- **Interactive overlays** — `overlays` on the `Book` model (jsonb column, migration
+  `flipbook_overlays`), validated in `lib/overlays.ts`. Types: video (YouTube/Vimeo/MP4,
+  pop-up or inline), image/GIF (movable layer), link (URL or `#page`), iframe embed.
+  Editor: `components/OverlayEditor.tsx` (drag/resize on a flat page surface, image upload,
+  Save). Viewer: `components/OverlayLayer.tsx` renders layers over each StPageFlip page +
+  a shared lightbox. Overlay images upload via the generalized asset endpoint (any safe kind).
+- **Sharing** — `ShareDialog` adds social buttons + a QR code (`qrcode` dep). Per-book
+  OpenGraph/Twitter card via `app/book/[id]/opengraph-image.tsx` (next/og), branded with the
+  book's title + accent.
+
+- **Still open (optional):** lead-capture gate + CSV export; a branded "bookshelf" landing
+  page; crawlable server-rendered body text; higher-DPI on-demand zoom render. Core
+  FlippingBook parity (3D viewer, branding, search, enrichment, share, security) is done.
 
 ## Hardening / known gaps (roughly in priority order)
 
