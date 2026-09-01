@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import type { Visibility } from "@/lib/types";
 
 interface ShareDialogProps {
@@ -68,6 +69,8 @@ export default function ShareDialog({
           <CopyField label="Embed on your website" value={embedCode} multiline />
         )}
 
+        <SharePanel shareUrl={shareUrl} title={title} />
+
         {isOwner && bookId && (
           <PrivacyPanel
             bookId={bookId}
@@ -75,6 +78,64 @@ export default function ShareDialog({
             hasPassword={hasPassword}
             onChange={onPrivacyChange}
           />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SharePanel({ shareUrl, title }: { shareUrl: string; title: string }) {
+  const [qr, setQr] = useState<string>("");
+
+  useEffect(() => {
+    let alive = true;
+    QRCode.toDataURL(shareUrl, { width: 320, margin: 1, color: { dark: "#0f172a", light: "#ffffff" } })
+      .then((url) => alive && setQr(url))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [shareUrl]);
+
+  const enc = encodeURIComponent(shareUrl);
+  const encTitle = encodeURIComponent(title);
+  const links: { label: string; href: string }[] = [
+    { label: "X", href: `https://twitter.com/intent/tweet?url=${enc}&text=${encTitle}` },
+    { label: "LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${enc}` },
+    { label: "Facebook", href: `https://www.facebook.com/sharer/sharer.php?u=${enc}` },
+    { label: "WhatsApp", href: `https://wa.me/?text=${encTitle}%20${enc}` },
+    { label: "Email", href: `mailto:?subject=${encTitle}&body=${enc}` },
+  ];
+
+  return (
+    <div className="mt-2 border-t border-slate-800 pt-5">
+      <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Share</span>
+      <div className="mt-3 flex items-start gap-4">
+        <div className="flex flex-wrap gap-2">
+          {links.map((l) => (
+            <a
+              key={l.label}
+              href={l.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-amber-400/60 hover:text-white"
+            >
+              {l.label}
+            </a>
+          ))}
+        </div>
+        {qr && (
+          <div className="ml-auto shrink-0 text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={qr} alt="QR code" className="h-24 w-24 rounded-lg bg-white p-1" />
+            <a
+              href={qr}
+              download="flipbook-qr.png"
+              className="mt-1 block text-[11px] text-amber-400 hover:underline"
+            >
+              Download QR
+            </a>
+          </div>
         )}
       </div>
     </div>
