@@ -166,9 +166,26 @@ npm run lint
   OpenGraph/Twitter card via `app/book/[id]/opengraph-image.tsx` (next/og), branded with the
   book's title + accent.
 
-- **Still open (optional):** lead-capture gate + CSV export; a branded "bookshelf" landing
-  page; crawlable server-rendered body text; higher-DPI on-demand zoom render. Core
-  FlippingBook parity (3D viewer, branding, search, enrichment, share, security) is done.
+## Marketing site, pricing & crisp zoom (added 2026-09-01, later)
+
+- **Routes restructured:** marketing homepage now lives at `/` (`app/page.tsx`), and the
+  creator app/library moved to `/app` (`app/app/page.tsx`). Viewer/embed routes unchanged.
+  Shared chrome in `components/SiteChrome.tsx` (`SiteHeader`/`SiteFooter`/`Wordmark`).
+- **Pricing** at `/pricing` (Free/Starter/Professional/Business) + FAQ. "Choose <plan>"
+  links hit `GET /api/checkout?plan=…`, which opens a real **Stripe Checkout** when
+  `STRIPE_SECRET_KEY` + `STRIPE_PRICE_*` are set (via Stripe's REST API — no SDK dep), and
+  otherwise redirects to sign-up. Prices are placeholders — edit `PLANS` in the pages.
+- **Auth pages:** `/sign-in` and `/sign-up` render Clerk's widgets and land users in `/app`;
+  in open mode they redirect straight to `/app`. New Clerk URL env vars documented in
+  `.env.example`.
+- **Hero image:** `public/hero.png` is a real product screenshot used on the landing hero.
+- **Crisp zoom:** `lib/pdf-client.ts` `renderPageHiRes` re-renders the current page from the
+  PDF at up to 3600px for the zoom/lightbox (`components/ZoomOverlay.tsx`), replacing bitmap
+  upscaling.
+
+- **Still open (optional):** lead-capture gate + CSV export; a branded "bookshelf" page;
+  crawlable server-rendered body text; a Stripe webhook to persist subscription state (the
+  checkout scaffold starts sessions but doesn't yet gate features by plan).
 
 ## Hardening / known gaps (roughly in priority order)
 

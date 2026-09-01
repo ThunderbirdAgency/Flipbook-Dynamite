@@ -43,9 +43,9 @@ export default async function BookPage({ params }: Props) {
       <header className="z-30 flex items-center justify-between border-b border-slate-800/80 bg-slate-950/95 px-4 py-2.5 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <Link
-            href="/"
+            href={canManage ? "/app" : "/"}
             className="flex shrink-0 items-center gap-2 text-sm font-semibold text-white transition hover:text-amber-400"
-            title="Back to library"
+            title={canManage ? "Back to your library" : "Flipbook Dynamite"}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6" />
