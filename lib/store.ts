@@ -166,12 +166,23 @@ async function sbDelete(id: string): Promise<boolean> {
   await sbRest(`${EVENTS_TABLE}?book_id=eq.${encodeURIComponent(id)}`, {
     method: "DELETE",
   }).catch(() => {});
-  for (const kind of ["logo", "background"] as const) {
-    await fetch(`${SUPABASE_URL}/storage/v1/object/${ASSETS_BUCKET}/${id}/${kind}`, {
-      method: "DELETE",
-      headers: sbHeaders(),
-    }).catch(() => {});
-  }
+  // Remove every asset in this book's folder (logo, background, ovl-*).
+  await fetch(`${SUPABASE_URL}/storage/v1/object/list/${ASSETS_BUCKET}`, {
+    method: "POST",
+    headers: sbHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ prefix: `${id}/`, limit: 1000 }),
+  })
+    .then((r) => (r.ok ? r.json() : []))
+    .then((items: Array<{ name: string }>) => {
+      const prefixes = (items || []).map((it) => `${id}/${it.name}`);
+      if (prefixes.length === 0) return;
+      return fetch(`${SUPABASE_URL}/storage/v1/object/${ASSETS_BUCKET}`, {
+        method: "DELETE",
+        headers: sbHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ prefixes }),
+      });
+    })
+    .catch(() => {});
   return true;
 }
 
@@ -251,6 +262,7 @@ export async function listBooks(ownerId?: string): Promise<StoredBook[]> {
 }
 
 export async function getBook(id: string): Promise<StoredBook | null> {
+  if (!/^[A-Za-z0-9_-]+$/.test(id)) return null;
   if (supabaseMode) return sbGet(id);
   const books = await readIndex();
   return books.find((b) => b.id === id) ?? null;
@@ -307,8 +319,17 @@ export async function deleteBook(id: string): Promise<boolean> {
   await writeIndex(books);
   await fs.unlink(fsPdfPath(id)).catch(() => {});
   await fs.unlink(path.join(EVENTS_DIR, `${id}.jsonl`)).catch(() => {});
-  await fs.unlink(path.join(ASSETS_DIR, `${id}-logo`)).catch(() => {});
-  await fs.unlink(path.join(ASSETS_DIR, `${id}-background`)).catch(() => {});
+  // Remove every asset for this book (logo, background, and any ovl-* overlays).
+  await fs
+    .readdir(ASSETS_DIR)
+    .then((files) =>
+      Promise.all(
+        files
+          .filter((f) => f.startsWith(`${id}-`))
+          .map((f) => fs.unlink(path.join(ASSETS_DIR, f)).catch(() => {}))
+      )
+    )
+    .catch(() => {});
   return true;
 }
 
@@ -426,6 +447,25 @@ export async function saveAsset(
   }
   // Backend-agnostic, cache-busted URL served by our own route.
   return `/api/books/${id}/asset/${kind}?v=${Date.now()}`;
+}
+
+/** Read an asset's raw bytes (used to proxy assets of gated books). */
+export async function readAssetBytes(id: string, kind: string): Promise<Buffer | null> {
+  assertValidId(id);
+  assertValidKind(kind);
+  if (supabaseMode) {
+    const res = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/${ASSETS_BUCKET}/${id}/${kind}`,
+      { headers: sbHeaders(), cache: "no-store" }
+    );
+    if (!res.ok) return null;
+    return Buffer.from(await res.arrayBuffer());
+  }
+  try {
+    return await fs.readFile(path.join(ASSETS_DIR, `${id}-${kind}`));
+  } catch {
+    return null;
+  }
 }
 
 /** How to deliver an image asset for the public GET route. */

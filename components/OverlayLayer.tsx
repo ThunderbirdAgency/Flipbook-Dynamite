@@ -116,7 +116,9 @@ export function OverlayItem({
         <iframe
           src={url}
           className="h-full w-full border-0"
-          allow="fullscreen; clipboard-write"
+          allow="fullscreen"
+          sandbox="allow-scripts allow-popups allow-forms"
+          referrerPolicy="no-referrer"
           title={o.label || "Embedded content"}
         />
       </div>
@@ -199,7 +201,14 @@ export function OverlayLightbox({ overlay, onClose }: { overlay: Overlay; onClos
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url} alt={overlay.label || ""} className="h-full w-full object-contain" />
         ) : (
-          <iframe src={url} className="h-full w-full border-0" allow="fullscreen; clipboard-write" title={overlay.label || "Embedded content"} />
+          <iframe
+            src={url}
+            className="h-full w-full border-0"
+            allow="fullscreen"
+            sandbox="allow-scripts allow-popups allow-forms"
+            referrerPolicy="no-referrer"
+            title={overlay.label || "Embedded content"}
+          />
         )}
       </div>
     </div>

@@ -14,8 +14,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!book) return { title: "Not found — Flipbook Dynamite" };
   const priv = book.visibility === "private" || book.hasPassword;
   const b = book.branding ?? {};
-  const title = b.seoTitle || `${book.title} — Flipbook Dynamite`;
-  const description = b.seoDescription || `Read “${book.title}” as an interactive flipbook.`;
+  // Don't leak a private book's real title/description before the gate.
+  const title = priv
+    ? "Protected flipbook — Flipbook Dynamite"
+    : b.seoTitle || `${book.title} — Flipbook Dynamite`;
+  const description = priv
+    ? "This flipbook is private. Sign in or enter the password to view it."
+    : b.seoDescription || `Read “${book.title}” as an interactive flipbook.`;
   return {
     title,
     description,

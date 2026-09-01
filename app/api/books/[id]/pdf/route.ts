@@ -33,7 +33,15 @@ export async function GET(req: NextRequest, { params }: Params) {
   const delivery = await getPdfDelivery(id, download, safeName);
 
   if (delivery.kind === "redirect") {
-    return NextResponse.redirect(delivery.url, 307);
+    const gated = book.visibility === "private" || book.hasPassword;
+    return new NextResponse(null, {
+      status: 307,
+      headers: {
+        Location: delivery.url,
+        // A gated book's signed URL must not be cached by shared caches/CDNs.
+        "Cache-Control": gated ? "private, no-store" : "public, max-age=300",
+      },
+    });
   }
 
   let data: Buffer;

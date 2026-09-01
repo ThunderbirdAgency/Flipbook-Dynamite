@@ -39,9 +39,11 @@ export function sanitizeOverlays(input: unknown): Overlay[] {
 
     const page = Math.max(1, Math.min(100000, Math.floor(Number(o.page) || 1)));
     const url = cleanUrl(o.url);
-    // A link/video/iframe with no valid URL is useless; drop it.
-    if (type !== "image" && !url) continue;
-    if (type === "image" && !url) continue;
+    // Every type needs a valid URL.
+    if (!url) continue;
+    // iframe embeds must be absolute cross-origin URLs — never a same-origin
+    // "/..." path (which, even sandboxed, could reach our own origin).
+    if (type === "iframe" && url.startsWith("/")) continue;
 
     const overlay: Overlay = {
       id:

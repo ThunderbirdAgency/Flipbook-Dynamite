@@ -31,8 +31,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       ? Math.max(1, Math.min(100000, Math.floor(Number(body.page))))
       : undefined;
 
-  // Anonymous, non-reversible visitor id (IP + UA), so we can count unique
-  // visits without storing anything personally identifying.
+  // Pseudonymous visitor id (keyed hash of IP + UA) used only to de-duplicate
+  // unique visits — we never store the raw IP or user agent.
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     req.headers.get("x-real-ip") ||

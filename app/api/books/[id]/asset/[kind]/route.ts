@@ -1,8 +1,15 @@
 import { promises as fs } from "fs";
 import { NextRequest, NextResponse } from "next/server";
-import { getAssetDelivery, getBook, saveAsset, updateBook } from "@/lib/store";
+import {
+  getAssetDelivery,
+  getBook,
+  readAssetBytes,
+  saveAsset,
+  updateBook,
+} from "@/lib/store";
 import { authEnabled, currentUserId } from "@/lib/auth";
 import { mergeBranding } from "@/lib/branding";
+import { gateBookRequest } from "@/lib/gate";
 import { toPublicBook } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -31,8 +38,9 @@ function sniffImage(buf: Buffer): string | null {
     buf.length > 11 && buf.subarray(8, 12).toString("ascii") === "WEBP"
   )
     return "image/webp";
-  const head = buf.subarray(0, 256).toString("utf-8").trimStart();
-  if (head.startsWith("<svg") || head.startsWith("<?xml")) return "image/svg+xml";
+  // Deliberately NOT accepting SVG: it can carry inline <script>, and these
+  // assets are served from our own origin — an SVG logo would be a stored-XSS
+  // vector. Raster formats only.
   return null;
 }
 
@@ -42,10 +50,35 @@ async function canManage(ownerId?: string): Promise<boolean> {
   return Boolean(userId && ownerId === userId);
 }
 
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(req: NextRequest, { params }: Params) {
   const { id, kind } = await params;
   if (!KIND_RE.test(kind)) return NextResponse.json({ error: "Bad asset" }, { status: 400 });
 
+  const book = await getBook(id);
+  if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Assets of a private/protected book must follow the same gate as the PDF, so
+  // a logo/background can't leak the fact-or-content of a gated book.
+  const gated = book.visibility === "private" || book.hasPassword;
+  if (gated) {
+    const { decision } = await gateBookRequest(book, req);
+    if (decision === "denied") return NextResponse.json({ error: "Private" }, { status: 403 });
+    if (decision === "needs-password")
+      return NextResponse.json({ error: "Password required" }, { status: 401 });
+    // Proxy the bytes so we never hand out a public/guessable storage URL.
+    const data = await readAssetBytes(id, kind);
+    if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return new NextResponse(new Uint8Array(data), {
+      headers: {
+        "Content-Type": sniffImage(data) || "application/octet-stream",
+        "Content-Length": String(data.length),
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  }
+
+  // Public book: fast path — filesystem streams; Supabase redirects to CDN.
   const delivery = await getAssetDelivery(id, kind);
   if (!delivery) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (delivery.kind === "redirect") return NextResponse.redirect(delivery.url, 307);
@@ -62,6 +95,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       "Content-Type": type,
       "Content-Length": String(data.length),
       "Cache-Control": "public, max-age=3600",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }

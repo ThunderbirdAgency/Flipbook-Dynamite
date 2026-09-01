@@ -10,9 +10,12 @@ export const contentType = "image/png";
 export default async function OpengraphImage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const book = await getBook(id);
-  const title = book?.branding?.seoTitle || book?.title || "Flipbook Dynamite";
   const accent = book?.branding?.accent || "#fbbf24";
   const priv = book ? book.visibility === "private" || book.hasPassword : false;
+  // Never render a private book's real title in a shareable image.
+  const title = priv
+    ? "Protected flipbook"
+    : book?.branding?.seoTitle || book?.title || "Flipbook Dynamite";
 
   return new ImageResponse(
     (

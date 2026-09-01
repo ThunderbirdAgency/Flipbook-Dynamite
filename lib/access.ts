@@ -87,7 +87,12 @@ export function verifyAccessToken(
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-/** Stable anonymous visitor id derived from a raw value (IP + UA), hashed. */
+/**
+ * Pseudonymous visitor id: a keyed hash of IP + UA, used only to de-duplicate
+ * unique visits. It is not stored in reversible form, but because IP+UA is
+ * low-entropy a specific known pair could be confirmed by recomputation — so
+ * this is a de-dup token, not an anonymization guarantee.
+ */
 export function visitorId(raw: string): string {
   return createHmac("sha256", SECRET).update(raw).digest("base64url").slice(0, 22);
 }
