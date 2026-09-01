@@ -7,6 +7,7 @@ Turn any PDF into an interactive page-flipping book — with realistic flip anim
 - **Drag & drop PDF upload** (up to 100 MB, multiple files at once)
 - **Realistic page-flip animation** — drag page corners, click, swipe, or use arrow keys ([StPageFlip](https://github.com/Nodlik/StPageFlip))
 - **Page-flip sound** 🔊 — synthesized paper swish on every turn (mutable, remembered per browser)
+- **Interactive layers** 🎬 — add **video pop-ups** (YouTube/Vimeo/MP4), **GIF/image** layers, **custom link** hotspots, and **iframe embeds** anywhere on a page, with a drag-to-place editor (move, resize, pop-up or inline). Layers travel with the page at any zoom
 - **Clickable links preserved** — external URLs in the PDF open in a new tab; internal links (table of contents, cross-references) flip to the right page
 - **Thumbnail strip** — jump to any page from a sidebar of page previews
 - **Full-text search** 🔎 — search inside the book; results show the page + a highlighted snippet and jump straight there (extracted from the PDF's text layer)

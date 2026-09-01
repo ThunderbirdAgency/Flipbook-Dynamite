@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
     hasPassword: Boolean(password),
     passwordHash: password ? hashPassword(password) : null,
     branding: {},
+    overlays: [],
   };
 
   await createBook(book);

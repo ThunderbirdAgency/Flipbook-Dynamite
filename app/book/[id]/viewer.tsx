@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import FlipbookViewer from "@/components/FlipbookViewer";
-import type { Branding, Visibility } from "@/lib/types";
+import type { Branding, Overlay, Visibility } from "@/lib/types";
 
 const noopSubscribe = () => () => {};
 
@@ -15,6 +15,7 @@ export default function BookViewer({
   visibility,
   hasPassword,
   branding,
+  overlays,
 }: {
   id: string;
   title: string;
@@ -22,6 +23,7 @@ export default function BookViewer({
   visibility: Visibility;
   hasPassword: boolean;
   branding: Branding;
+  overlays: Overlay[];
 }) {
   const origin = useSyncExternalStore(
     noopSubscribe,
@@ -41,6 +43,7 @@ export default function BookViewer({
       visibility={visibility}
       hasPassword={hasPassword}
       branding={branding}
+      overlays={overlays}
     />
   );
 }

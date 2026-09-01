@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { Branding, BookEvent, BookStats, StoredBook, Visibility } from "./types";
+import { Branding, BookEvent, BookStats, Overlay, StoredBook, Visibility } from "./types";
 
 // Two storage backends behind one API:
 //  - Supabase (Postgres + Storage) when NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY are
@@ -56,6 +56,7 @@ interface BookRow {
   visibility: string | null;
   password_hash: string | null;
   branding: Branding | null;
+  overlays: Overlay[] | null;
 }
 
 function rowToBook(row: BookRow): StoredBook {
@@ -70,6 +71,7 @@ function rowToBook(row: BookRow): StoredBook {
     hasPassword: Boolean(row.password_hash),
     passwordHash: row.password_hash ?? null,
     branding: row.branding ?? {},
+    overlays: row.overlays ?? [],
   };
 }
 
@@ -90,7 +92,7 @@ async function sbRest(pathAndQuery: string, init?: RequestInit): Promise<Respons
 }
 
 const BOOK_COLS =
-  "id,title,file_name,size,created_at,owner_id,visibility,password_hash,branding";
+  "id,title,file_name,size,created_at,owner_id,visibility,password_hash,branding,overlays";
 
 async function sbList(ownerId?: string): Promise<StoredBook[]> {
   const filter = ownerId ? `&owner_id=eq.${encodeURIComponent(ownerId)}` : "";
@@ -125,6 +127,7 @@ async function sbCreate(book: StoredBook): Promise<StoredBook> {
       visibility: book.visibility,
       password_hash: book.passwordHash,
       branding: book.branding ?? {},
+      overlays: book.overlays ?? [],
     }),
   });
   if (!res.ok) throw new Error(`Supabase insert failed (${res.status})`);
@@ -137,6 +140,7 @@ async function sbUpdate(id: string, patch: BookPatch): Promise<StoredBook | null
   if (patch.visibility !== undefined) body.visibility = patch.visibility;
   if (patch.passwordHash !== undefined) body.password_hash = patch.passwordHash;
   if (patch.branding !== undefined) body.branding = patch.branding;
+  if (patch.overlays !== undefined) body.overlays = patch.overlays;
   const res = await sbRest(`${TABLE}?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { Prefer: "return=representation" },
@@ -199,6 +203,7 @@ async function readIndex(): Promise<StoredBook[]> {
       hasPassword: Boolean(b.passwordHash),
       passwordHash: b.passwordHash ?? null,
       branding: b.branding ?? {},
+      overlays: b.overlays ?? [],
     }));
   } catch {
     return [];
@@ -226,6 +231,8 @@ export interface BookPatch {
   passwordHash?: string | null;
   /** Full replacement of the branding object (already merged by the caller). */
   branding?: Branding;
+  /** Full replacement of the overlays array (already sanitized by the caller). */
+  overlays?: Overlay[];
 }
 
 export function assertValidId(id: string) {
@@ -271,6 +278,7 @@ export async function updateBook(
   }
   if (patch.passwordHash !== undefined) clean.passwordHash = patch.passwordHash;
   if (patch.branding !== undefined) clean.branding = patch.branding;
+  if (patch.overlays !== undefined) clean.overlays = patch.overlays;
   if (Object.keys(clean).length === 0) return getBook(id);
 
   if (supabaseMode) return sbUpdate(id, clean);
@@ -284,6 +292,7 @@ export async function updateBook(
     book.hasPassword = Boolean(clean.passwordHash);
   }
   if (clean.branding !== undefined) book.branding = clean.branding;
+  if (clean.overlays !== undefined) book.overlays = clean.overlays;
   await writeIndex(books);
   return book;
 }
@@ -388,14 +397,19 @@ export async function savePdfBuffer(id: string, pdf: Buffer): Promise<void> {
 
 export type AssetKind = "logo" | "background";
 
-/** Persist a branding image and return the (stable) URL to reference it by. */
+function assertValidKind(kind: string) {
+  if (!/^[A-Za-z0-9_-]{1,60}$/.test(kind)) throw new Error("invalid asset kind");
+}
+
+/** Persist an image (branding or overlay) and return the stable URL for it. */
 export async function saveAsset(
   id: string,
-  kind: AssetKind,
+  kind: string,
   buf: Buffer,
   contentType: string
 ): Promise<string> {
   assertValidId(id);
+  assertValidKind(kind);
   if (supabaseMode) {
     const res = await fetch(
       `${SUPABASE_URL}/storage/v1/object/${ASSETS_BUCKET}/${id}/${kind}`,
@@ -414,12 +428,13 @@ export async function saveAsset(
   return `/api/books/${id}/asset/${kind}?v=${Date.now()}`;
 }
 
-/** How to deliver a branding image for the public GET route. */
+/** How to deliver an image asset for the public GET route. */
 export async function getAssetDelivery(
   id: string,
-  kind: AssetKind
+  kind: string
 ): Promise<PdfDelivery | null> {
   assertValidId(id);
+  assertValidKind(kind);
   if (supabaseMode) {
     return {
       kind: "redirect",

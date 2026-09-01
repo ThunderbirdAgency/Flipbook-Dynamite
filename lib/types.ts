@@ -1,5 +1,30 @@
 export type Visibility = "public" | "private";
 
+export type OverlayType = "link" | "video" | "image" | "iframe";
+
+/**
+ * An interactive element the owner places on a page: a video pop-up, a GIF/image
+ * layer, a clickable link, or an embedded iframe. Positioned in percentages of
+ * the page box so it survives any scale (same coordinate space as PDF links).
+ */
+export interface Overlay {
+  id: string;
+  /** 1-based page number this overlay belongs to. */
+  page: number;
+  /** Box, as percentages of the page (0–100). */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  type: OverlayType;
+  /** link href / video URL / image src / iframe src. */
+  url?: string;
+  /** Optional caption / accessible label. */
+  label?: string;
+  /** For video/image/iframe: open in a lightbox ("popup") or render in place ("inline"). */
+  display?: "popup" | "inline";
+}
+
 /** Per-book branding / white-label settings. All fields optional. */
 export interface Branding {
   /** Stage background color (any CSS color). */
@@ -37,6 +62,8 @@ export interface Book {
   hasPassword: boolean;
   /** Branding / white-label settings (safe to expose). */
   branding: Branding;
+  /** Interactive overlays placed on pages (safe to expose — public content). */
+  overlays: Overlay[];
 }
 
 /**
@@ -60,6 +87,7 @@ export function toPublicBook(book: StoredBook): Book {
     visibility: book.visibility,
     hasPassword: book.hasPassword,
     branding: book.branding ?? {},
+    overlays: book.overlays ?? [],
   };
 }
 

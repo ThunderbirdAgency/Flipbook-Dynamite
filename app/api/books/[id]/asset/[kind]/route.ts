@@ -1,12 +1,6 @@
 import { promises as fs } from "fs";
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getAssetDelivery,
-  getBook,
-  saveAsset,
-  updateBook,
-  type AssetKind,
-} from "@/lib/store";
+import { getAssetDelivery, getBook, saveAsset, updateBook } from "@/lib/store";
 import { authEnabled, currentUserId } from "@/lib/auth";
 import { mergeBranding } from "@/lib/branding";
 import { toPublicBook } from "@/lib/types";
@@ -16,10 +10,15 @@ export const runtime = "nodejs";
 type Params = { params: Promise<{ id: string; kind: string }> };
 
 const MAX_ASSET = 5 * 1024 * 1024; // 5 MB
-const KINDS: Record<string, { asset: AssetKind; field: "logoUrl" | "bgImageUrl" }> = {
-  logo: { asset: "logo", field: "logoUrl" },
-  background: { asset: "background", field: "bgImageUrl" },
-};
+const KIND_RE = /^[A-Za-z0-9_-]{1,60}$/;
+
+// logo/background feed branding fields; any other (safe) kind is a generic
+// asset (e.g. an overlay image/GIF) that just returns its URL.
+function brandingField(kind: string): "logoUrl" | "bgImageUrl" | null {
+  if (kind === "logo") return "logoUrl";
+  if (kind === "background") return "bgImageUrl";
+  return null;
+}
 
 /** Sniff an image content-type from magic bytes; null if it isn't an image. */
 function sniffImage(buf: Buffer): string | null {
@@ -45,10 +44,9 @@ async function canManage(ownerId?: string): Promise<boolean> {
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const { id, kind } = await params;
-  const spec = KINDS[kind];
-  if (!spec) return NextResponse.json({ error: "Bad asset" }, { status: 400 });
+  if (!KIND_RE.test(kind)) return NextResponse.json({ error: "Bad asset" }, { status: 400 });
 
-  const delivery = await getAssetDelivery(id, spec.asset);
+  const delivery = await getAssetDelivery(id, kind);
   if (!delivery) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (delivery.kind === "redirect") return NextResponse.redirect(delivery.url, 307);
 
@@ -70,8 +68,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { id, kind } = await params;
-  const spec = KINDS[kind];
-  if (!spec) return NextResponse.json({ error: "Bad asset" }, { status: 400 });
+  if (!KIND_RE.test(kind)) return NextResponse.json({ error: "Bad asset" }, { status: 400 });
 
   const book = await getBook(id);
   if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -89,16 +86,21 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Not a supported image" }, { status: 415 });
   }
 
-  const url = await saveAsset(id, spec.asset, buffer, contentType);
-  const branding = mergeBranding(book.branding ?? {}, { [spec.field]: url });
-  const updated = await updateBook(id, { branding });
-  return NextResponse.json({ url, book: updated ? toPublicBook(updated) : null });
+  const url = await saveAsset(id, kind, buffer, contentType);
+  const field = brandingField(kind);
+  if (field) {
+    const branding = mergeBranding(book.branding ?? {}, { [field]: url });
+    const updated = await updateBook(id, { branding });
+    return NextResponse.json({ url, book: updated ? toPublicBook(updated) : null });
+  }
+  // Generic asset (overlay image/GIF) — just hand back the URL.
+  return NextResponse.json({ url, book: toPublicBook(book) });
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const { id, kind } = await params;
-  const spec = KINDS[kind];
-  if (!spec) return NextResponse.json({ error: "Bad asset" }, { status: 400 });
+  const field = brandingField(kind);
+  if (!field) return NextResponse.json({ error: "Bad asset" }, { status: 400 });
 
   const book = await getBook(id);
   if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -106,7 +108,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Not your book" }, { status: 403 });
   }
 
-  const branding = mergeBranding(book.branding ?? {}, { [spec.field]: null });
+  const branding = mergeBranding(book.branding ?? {}, { [field]: null });
   const updated = await updateBook(id, { branding });
   return NextResponse.json({ book: updated ? toPublicBook(updated) : null });
 }

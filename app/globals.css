@@ -202,3 +202,8 @@ body {
   background: rgba(251, 191, 36, 0.18);
   outline: 1px solid rgba(251, 191, 36, 0.55);
 }
+
+/* Interactive overlays (video / image / iframe layers) sit above paper cues. */
+.fb-overlay {
+  z-index: 2;
+}

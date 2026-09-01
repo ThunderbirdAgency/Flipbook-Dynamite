@@ -11,7 +11,9 @@ import ThumbnailStrip from "@/components/ThumbnailStrip";
 import TocPanel from "@/components/TocPanel";
 import SearchPanel from "@/components/SearchPanel";
 
-import type { Branding, Visibility } from "@/lib/types";
+import type { Branding, Overlay, Visibility } from "@/lib/types";
+import { OverlayItem, OverlayLightbox } from "@/components/OverlayLayer";
+import OverlayEditor from "@/components/OverlayEditor";
 
 interface FlipbookViewerProps {
   pdfUrl: string;
@@ -27,6 +29,8 @@ interface FlipbookViewerProps {
   hasPassword?: boolean;
   /** Per-book branding: background, logo, accent, download toggle. */
   branding?: Branding;
+  /** Interactive overlays placed on pages. */
+  overlays?: Overlay[];
 }
 
 type Status = "loading" | "ready" | "error";
@@ -44,10 +48,14 @@ export default function FlipbookViewer({
   visibility = "public",
   hasPassword = false,
   branding = {},
+  overlays = [],
 }: FlipbookViewerProps) {
   // Held in state so the owner's branding edits reflect live in the viewer.
   const [brand, setBrand] = useState<Branding>(branding);
   const [brandOpen, setBrandOpen] = useState(false);
+  const [overlayList, setOverlayList] = useState<Overlay[]>(overlays);
+  const [editOpen, setEditOpen] = useState(false);
+  const [lightbox, setLightbox] = useState<Overlay | null>(null);
   const accent = brand.accent || "#fbbf24";
   const showDownload = brand.allowDownload !== false && Boolean(downloadUrl);
   const customBg = brand.bgImageUrl
@@ -375,6 +383,16 @@ export default function FlipbookViewer({
                       />
                     )
                   )}
+                  {overlayList
+                    .filter((o) => o.page === i + 1)
+                    .map((o) => (
+                      <OverlayItem
+                        key={o.id}
+                        overlay={o}
+                        onJump={goToPage}
+                        onOpen={setLightbox}
+                      />
+                    ))}
                 </div>
               ))}
             </div>
@@ -483,6 +501,11 @@ export default function FlipbookViewer({
               </ToolbarButton>
             )}
             {isOwner && bookId && (
+              <ToolbarButton label="Add video / links / layers" onClick={() => setEditOpen(true)}>
+                <LayersIcon />
+              </ToolbarButton>
+            )}
+            {isOwner && bookId && (
               <ToolbarButton label="Customize / branding" onClick={() => setBrandOpen(true)}>
                 <BrushIcon />
               </ToolbarButton>
@@ -572,6 +595,18 @@ export default function FlipbookViewer({
           onChange={setBrand}
         />
       )}
+
+      {isOwner && bookId && editOpen && pages && (
+        <OverlayEditor
+          bookId={bookId}
+          pages={pages}
+          overlays={overlayList}
+          onChange={setOverlayList}
+          onClose={() => setEditOpen(false)}
+        />
+      )}
+
+      {lightbox && <OverlayLightbox overlay={lightbox} onClose={() => setLightbox(null)} />}
 
       {zoomOpen && pages && (
         <ZoomOverlay
@@ -756,6 +791,16 @@ function SearchIcon() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="11" cy="11" r="7" />
       <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function LayersIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+      <polyline points="2 17 12 22 22 17" />
+      <polyline points="2 12 12 17 22 12" />
     </svg>
   );
 }

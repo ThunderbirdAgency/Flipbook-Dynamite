@@ -3,6 +3,7 @@ import { deleteBook, getBook, updateBook, type BookPatch } from "@/lib/store";
 import { authEnabled, currentUserId } from "@/lib/auth";
 import { hashPassword } from "@/lib/access";
 import { mergeBranding } from "@/lib/branding";
+import { sanitizeOverlays } from "@/lib/overlays";
 import { gateBookRequest } from "@/lib/gate";
 import { StoredBook, toPublicBook } from "@/lib/types";
 
@@ -62,6 +63,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
   if (body.branding && typeof body.branding === "object") {
     patch.branding = mergeBranding(book.branding ?? {}, body.branding);
+  }
+  if (Array.isArray(body.overlays)) {
+    patch.overlays = sanitizeOverlays(body.overlays);
   }
 
   if (Object.keys(patch).length === 0) {

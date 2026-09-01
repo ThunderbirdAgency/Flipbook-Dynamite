@@ -64,6 +64,7 @@ export default async function BookPage({ params }: Props) {
             visibility={book.visibility}
             hasPassword={book.hasPassword}
             branding={book.branding ?? {}}
+            overlays={book.overlays ?? []}
           />
         ) : decision === "needs-password" ? (
           <UnlockGate id={book.id} title={book.title} />
