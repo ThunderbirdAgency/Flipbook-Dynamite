@@ -613,6 +613,7 @@ export default function FlipbookViewer({
           pages={pages}
           startIndex={Math.min(current, pages.length - 1)}
           title={title}
+          pdfUrl={pdfUrl}
           onClose={() => setZoomOpen(false)}
         />
       )}

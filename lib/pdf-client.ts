@@ -230,6 +230,59 @@ async function extractLinks(
   return links;
 }
 
+// A cached document handle for on-demand hi-res renders (zoom), so we parse the
+// PDF once rather than reopening it for every zoomed page.
+const hiResDocCache = new Map<string, Promise<Awaited<ReturnType<Pdfjs["getDocument"]>["promise"]>>>();
+
+function getCachedDoc(pdfUrl: string) {
+  let p = hiResDocCache.get(pdfUrl);
+  if (!p) {
+    p = loadPdfjs().then((pdfjs) => pdfjs.getDocument({ url: pdfUrl }).promise);
+    hiResDocCache.set(pdfUrl, p);
+  }
+  return p;
+}
+
+export interface HiResPage {
+  objectUrl: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * Render a single page at high resolution for the zoom/lightbox view, so text
+ * stays crisp instead of upscaling the thumbnail-grade bitmap. `maxEdge` is the
+ * longest side in device pixels of the produced image.
+ */
+export async function renderPageHiRes(
+  pdfUrl: string,
+  pageIndex: number,
+  maxEdge = 3600
+): Promise<HiResPage> {
+  const doc = await getCachedDoc(pdfUrl);
+  const page = await doc.getPage(pageIndex + 1);
+  const base = page.getViewport({ scale: 1 });
+  const scale = Math.min(6, Math.max(1, maxEdge / Math.max(base.width, base.height)));
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvas, viewport }).promise;
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.92)
+  );
+  const width = canvas.width;
+  const height = canvas.height;
+  canvas.width = 0;
+  canvas.height = 0;
+  page.cleanup();
+  if (!blob) throw new Error("Could not render page");
+  return { objectUrl: URL.createObjectURL(blob), width, height };
+}
+
 /** Read a PDF's page count without rendering anything. */
 export async function getPageCount(pdfUrl: string): Promise<number> {
   const pdfjs = await loadPdfjs();

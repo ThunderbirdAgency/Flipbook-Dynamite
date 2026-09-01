@@ -1,23 +1,55 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { RenderedPage } from "@/lib/pdf-client";
+import { RenderedPage, renderPageHiRes } from "@/lib/pdf-client";
 
 interface ZoomOverlayProps {
   pages: RenderedPage[];
   startIndex: number;
   title: string;
   onClose: () => void;
+  /** Source PDF, used to re-render the current page crisply for deep zoom. */
+  pdfUrl?: string;
 }
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 5;
 
-export default function ZoomOverlay({ pages, startIndex, title, onClose }: ZoomOverlayProps) {
+export default function ZoomOverlay({ pages, startIndex, title, onClose, pdfUrl }: ZoomOverlayProps) {
   const [index, setIndex] = useState(startIndex);
   const [scale, setScale] = useState(1.6);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+
+  // Crisp on-demand re-render of the current page from the PDF (cached per page).
+  const [hiRes, setHiRes] = useState<Record<number, string>>({});
+  const urlsRef = useRef<string[]>([]);
+  const rendering = Boolean(pdfUrl) && !hiRes[index];
+
+  useEffect(() => {
+    if (!pdfUrl || hiRes[index]) return;
+    let alive = true;
+    renderPageHiRes(pdfUrl, index)
+      .then((r) => {
+        if (!alive) {
+          URL.revokeObjectURL(r.objectUrl);
+          return;
+        }
+        urlsRef.current.push(r.objectUrl);
+        setHiRes((prev) => (prev[index] ? prev : { ...prev, [index]: r.objectUrl }));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, pdfUrl]);
+
+  // Revoke every hi-res object URL when the overlay closes.
+  useEffect(() => {
+    const urls = urlsRef.current;
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, []);
 
   const page = pages[index];
 
@@ -48,8 +80,13 @@ export default function ZoomOverlay({ pages, startIndex, title, onClose }: ZoomO
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/97">
       <div className="flex items-center justify-between px-4 py-3">
-        <span className="text-sm text-slate-400">
+        <span className="flex items-center gap-2 text-sm text-slate-400">
           {title} — page {index + 1} of {pages.length}
+          {hiRes[index] ? (
+            <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400">HD</span>
+          ) : rendering ? (
+            <span className="rounded bg-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">sharpening…</span>
+          ) : null}
         </span>
         <div className="flex items-center gap-1">
           <ZoomButton label="Zoom out" onClick={() => setScale((s) => clampScale(s / 1.3))}>−</ZoomButton>
@@ -96,13 +133,14 @@ export default function ZoomOverlay({ pages, startIndex, title, onClose }: ZoomO
         <div className="flex h-full items-center justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={page.objectUrl}
+            src={hiRes[index] || page.objectUrl}
             alt={`Page ${index + 1}`}
             draggable={false}
             className="max-h-full select-none shadow-2xl"
             style={{
               transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
               transformOrigin: "center center",
+              imageRendering: "auto",
             }}
           />
         </div>
