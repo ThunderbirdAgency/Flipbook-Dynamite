@@ -18,7 +18,30 @@ Read-only inspection on September 5 found no books and no stored objects.
 `flipbook-pdfs` is private; `flipbook-assets` is still public and must become private
 with this release. Books/events have RLS and no client policies, intentionally:
 all privileged operations run on the server with a service-role key.
-No live schema or deployment changes were made during this preparation.
+No live schema changes have been made. GitHub automatically deployed the candidate
+to a Vercel preview, and its CI checks passed. The preview is not yet configured for
+real sign-in or uploads.
+
+Authenticated Vercel inspection confirmed the existing project:
+
+- Team: `thunderbird-agency`; account: `emiller-4447`.
+- Project ID: `prj_gIE6JB755AmBTm5XgJFuH8b3MAJ1`; Node.js 24.x; root directory `.`.
+- Production still uses `claude/pdf-flipping-book-app-sukfbi`. Do not change traffic
+  until the candidate is configured and verified.
+- Candidate preview alias:
+  `https://flipbook-dynamite-git-release-flipboo-06762b-thunderbird-agency.vercel.app`.
+- Initially no application environment variables or integration resources existed.
+  Production app URL/Supabase URL and fresh signing/cron secrets have now been added.
+  The release preview has its own signing/cron secrets, restricted to that branch.
+- Clerk provisioning on the free Hobby plan is awaiting the owner's Marketplace
+  terms acceptance. The CLI returned `integration_terms_acceptance_required`; no
+  Clerk resource or paid plan was created.
+- The existing Supabase service-role credential still needs to be added securely to
+  the project. Do not paste credentials into a chat, document, or commit.
+- `flipbookdynamite.com` is attached to this Vercel project. GoDaddy still controls
+  DNS and serves its existing parking records. No DNS or nameserver changes made.
+  Vercel currently recommends two apex A records: `216.150.1.1` and `216.150.16.1`.
+  Reverify these recommendations at launch; defer the DNS cutover until validation.
 
 Existing migration history: initialization, July access hardening, branding, overlays.
 The new SQL has been tested locally but has NOT been applied to the live project.
@@ -49,19 +72,22 @@ The new SQL has been tested locally but has NOT been applied to the live project
 
 ## Deployment sequence
 
-1. Inspect the connected Vercel project, its production branch, domain, and env names.
-   Vercel connection was confirmed, but tools were not exposed in the active session.
-2. Configure a Clerk application and all seven required values in `.env.example` in
+1. Use the existing linked Vercel project identified above. The connected app's empty
+   project list was misleading; authenticated CLI inspection works. Do not create a
+   duplicate project.
+2. Finish Clerk Marketplace terms acceptance and provisioning, then configure the
+   remaining required values from `.env.example` in
    Vercel's intended environments. Store service-role, Clerk, and signing secrets only
    as protected server settings. The browser does not need a Supabase anon key.
 3. Generate a migration using `supabase migration new release_readiness`. Put the
    reviewed SQL from `tests/fixtures/readiness-schema.sql` into that generated file.
-   The CLI could not be installed in this environment: its network approval was
-   cancelled. The SQL remains a tested draft fixture, not a generated migration.
+   A CLI binary is present, but its execution was blocked with "network approval was
+   cancelled before a decision was returned." The SQL remains a tested draft fixture,
+   not a generated migration.
 4. Recheck live data and apply the migration to the dedicated project. Preserve all
    existing columns and features. Verify both buckets are private, client roles cannot
    access metadata/objects, reservations work, and security advisors show no new risks.
-5. Deploy this candidate to a Vercel preview with the complete environment. Existing
+5. Redeploy this candidate to its Vercel preview with the complete environment. Existing
    deployments need the new code alongside the image bucket change. Do not route
    customers to a partially configured version.
 6. Confirm the authenticated nightly `/api/maintenance` job runs and expired upload
