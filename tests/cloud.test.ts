@@ -25,7 +25,14 @@ test("cloud upload stays pending until storage bytes verify; no privileged key i
     assert.equal(headers.get("authorization"), "Bearer test-server-key");
     if (url.includes("status=in.(pending,deleted)")) return Response.json([{ id: book.id }]);
     if (url.includes("/rest/v1/flipbook_books") && !init?.method) return Response.json([{ ...book, file_name: book.fileName, created_at: book.createdAt, owner_id: book.ownerId, password_hash: null }]);
-    if (url.includes("/object/upload/sign/")) return Response.json({ url: "/object/upload/sign/flipbook-pdfs/cloudbook01.pdf?token=scoped-token" });
+    if (url.includes("/object/upload/sign/")) {
+      assert.equal(init?.method, "POST");
+      assert.equal(headers.get("content-type"), "application/json");
+      // Like Storage's JSON parser, reject requests declaring JSON without a body.
+      if (!init?.body) return Response.json({ error: "Empty JSON body" }, { status: 400 });
+      assert.deepEqual(JSON.parse(String(init.body)), {});
+      return Response.json({ url: "/object/upload/sign/flipbook-pdfs/cloudbook01.pdf?token=scoped-token" });
+    }
     if (url.includes("/object/authenticated/")) {
       if (storageMissing) return new Response(null, { status: 404 });
       assert.equal(headers.get("range"), "bytes=0-1023");

@@ -357,7 +357,12 @@ export async function getUploadTarget(id: string): Promise<UploadTarget> {
   {
     const res = await fetch(
       `${SUPABASE_URL}/storage/v1/object/upload/sign/${BUCKET}/${objectPath}`,
-      { method: "POST", headers: sbHeaders({ "Content-Type": "application/json" }) }
+      {
+        method: "POST",
+        headers: sbHeaders({ "Content-Type": "application/json" }),
+        // Storage parses JSON before signing; a zero-byte JSON body is invalid.
+        body: JSON.stringify({}),
+      }
     );
     if (!res.ok) {
       throw new Error(`Could not create signed upload URL (${res.status})`);
