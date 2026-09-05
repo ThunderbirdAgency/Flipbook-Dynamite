@@ -10,8 +10,8 @@ export const contentType = "image/png";
 export default async function OpengraphImage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const book = await getBook(id);
-  const accent = book?.branding?.accent || "#fbbf24";
   const priv = book ? book.visibility === "private" || book.hasPassword : false;
+  const accent = priv ? "#fbbf24" : book?.branding?.accent || "#fbbf24";
   // Never render a private book's real title in a shareable image.
   const title = priv
     ? "Protected flipbook"

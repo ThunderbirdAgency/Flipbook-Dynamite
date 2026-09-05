@@ -1,5 +1,6 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { configuration } from "./lib/config";
+import { NextRequest, NextResponse } from "next/server";
 
 const authEnabled = Boolean(
   process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY
@@ -7,8 +8,14 @@ const authEnabled = Boolean(
 
 // Clerk needs to see every request when auth is on; in open mode (no keys)
 // requests pass straight through.
-const proxy = authEnabled ? clerkMiddleware() : () => NextResponse.next();
-export default proxy;
+const clerk = clerkMiddleware();
+export default async function proxy(req: NextRequest, event: Parameters<typeof clerk>[1]) {
+  if (req.nextUrl.pathname.startsWith("/api/") && !configuration().ready) {
+    return NextResponse.json({ error: "Flipbook Dynamite is being set up. Please try again later." }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
+  return authEnabled ? clerk(req, event) : NextResponse.next();
+}
+
 
 export const config = {
   matcher: [

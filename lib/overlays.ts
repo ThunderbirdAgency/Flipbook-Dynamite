@@ -18,7 +18,7 @@ function cleanUrl(v: unknown): string | undefined {
   if (typeof v !== "string") return undefined;
   const s = v.trim().slice(0, 2048);
   if (!s) return undefined;
-  if (s.startsWith("/")) return s; // same-origin path (e.g. internal jump target or our asset)
+  if (s.startsWith("/") && !s.startsWith("//") && !s.includes("\\")) return s; // same-origin path (e.g. internal jump target or our asset)
   try {
     const u = new URL(s);
     if (u.protocol === "http:" || u.protocol === "https:") return s;

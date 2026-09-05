@@ -1,3 +1,4 @@
+import { safeLink } from "./validation";
 // Client-side PDF rendering helpers built on pdf.js. Everything in this file
 // must only run in the browser (it touches canvas, workers and object URLs).
 
@@ -122,6 +123,9 @@ export async function renderPdfToPages(
       page.cleanup();
       onProgress?.(i, doc.numPages);
     }
+  } catch (error) {
+    pages.forEach((page) => URL.revokeObjectURL(page.objectUrl));
+    throw error;
   } finally {
     task.destroy().catch(() => {});
   }
@@ -205,7 +209,7 @@ async function extractLinks(
       height: (height / viewport.height) * 100,
     };
 
-    if (typeof annot.url === "string" && annot.url) {
+    if (typeof annot.url === "string" && safeLink(annot.url)) {
       links.push({ ...box, url: annot.url });
       continue;
     }

@@ -12,15 +12,6 @@ import type { StoredBook } from "./types";
 const SECRET =
   process.env.FLIPBOOK_SECRET || randomBytes(32).toString("hex");
 
-if (!process.env.FLIPBOOK_SECRET && process.env.NODE_ENV === "production") {
-  // Loud but non-fatal: unlocks and unique-visitor counts won't persist across
-  // deploys/instances until a stable secret is configured.
-  console.warn(
-    "[flipbook] FLIPBOOK_SECRET is not set — access tokens use an ephemeral " +
-      "secret and will not be stable across restarts or instances."
-  );
-}
-
 /* ----------------------------- Passwords ----------------------------- */
 
 /** Hash a viewing password with scrypt. Returns `salt:hash` (hex). */
@@ -62,9 +53,9 @@ function sign(payload: string): string {
  * Mint a signed token proving the bearer unlocked `bookId`. The token embeds an
  * expiry and is bound to the book id, so it can't be replayed against others.
  */
-export function mintAccessToken(bookId: string, nowMs: number): string {
+export function mintAccessToken(bookId: string, nowMs: number, passwordHash: string): string {
   const exp = Math.floor(nowMs / 1000) + ACCESS_TTL_SECONDS;
-  const payload = `${bookId}.${exp}`;
+  const payload = `${bookId}.${exp}.${passwordHash}`;
   return `${exp}.${sign(payload)}`;
 }
 
@@ -72,16 +63,17 @@ export function mintAccessToken(bookId: string, nowMs: number): string {
 export function verifyAccessToken(
   token: string | undefined,
   bookId: string,
-  nowMs: number
+  nowMs: number,
+  passwordHash: string | null
 ): boolean {
-  if (!token) return false;
+  if (!token || !passwordHash) return false;
   const dot = token.indexOf(".");
   if (dot === -1) return false;
   const expStr = token.slice(0, dot);
   const mac = token.slice(dot + 1);
   const exp = Number(expStr);
-  if (!Number.isFinite(exp) || exp * 1000 < nowMs) return false;
-  const expected = sign(`${bookId}.${exp}`);
+  if (!Number.isFinite(exp) || exp * 1000 <= nowMs) return false;
+  const expected = sign(`${bookId}.${exp}.${passwordHash}`);
   const a = Buffer.from(mac);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);

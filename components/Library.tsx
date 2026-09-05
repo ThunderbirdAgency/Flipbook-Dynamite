@@ -2,34 +2,37 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Book } from "@/lib/types";
 import { renderFirstPage } from "@/lib/pdf-client";
 
 export default function Library() {
+  const router = useRouter();
   const [books, setBooks] = useState<Book[] | null>(null);
   const [uploadError, setUploadError] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  const refresh = useCallback(() => {
-    return fetch("/api/books")
-      .then((res) => res.json())
-      .then((data) => setBooks(data.books ?? []))
-      .catch(() => setBooks([]));
+  const [loadError, setLoadError] = useState("");
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/books", { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not load your library");
+      setBooks(data.books);
+      setLoadError("");
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Could not load your library");
+    }
   }, []);
 
   useEffect(() => {
     let alive = true;
-    fetch("/api/books")
-      .then((res) => res.json())
-      .then((data) => {
-        if (alive) setBooks(data.books ?? []);
-      })
-      .catch(() => {
-        if (alive) setBooks([]);
-      });
-    return () => {
-      alive = false;
-    };
+    fetch("/api/books", { cache: "no-store" }).then(async res => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not load your library");
+      if (alive) setBooks(data.books);
+    }).catch(error => { if (alive) setLoadError(error.message); });
+    return () => { alive = false; };
   }, []);
 
   const upload = useCallback(
@@ -69,27 +72,39 @@ export default function Library() {
             const detail = await up.json().catch(() => ({}));
             throw new Error(detail.error || detail.message || `Upload failed (${up.status})`);
           }
+          const completed = await fetch(`/api/books/${data.book.id}/complete`, { method: "POST" });
+          if (!completed.ok) {
+            const result = await completed.json().catch(() => ({}));
+            throw new Error(result.error || "The PDF could not be verified. Delete the unfinished upload and try again.");
+          }
           lastId = data.book.id;
         }
         await refresh();
         // Jump straight into the flipbook when a single file was uploaded.
         if (pdfs.length === 1 && lastId) {
-          window.location.href = `/book/${lastId}`;
+          router.push(`/book/${lastId}`);
         }
       } catch (err) {
         setUploadError(err instanceof Error ? err.message : "Upload failed.");
       } finally {
+        await refresh();
         setUploading(false);
       }
     },
-    [refresh]
+    [refresh, router]
   );
 
   const remove = useCallback(
     async (id: string) => {
       if (!confirm("Delete this flipbook? This cannot be undone.")) return;
-      await fetch(`/api/books/${id}`, { method: "DELETE" });
-      await refresh();
+      try {
+        const res = await fetch(`/api/books/${id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Could not delete this flipbook");
+        }
+        await refresh();
+      } catch (error) { setUploadError(error instanceof Error ? error.message : "Could not delete this flipbook"); }
     },
     [refresh]
   );
@@ -108,7 +123,7 @@ export default function Library() {
         )}
       </h2>
 
-      {books === null ? (
+      {loadError ? <div role="alert" className="text-sm text-red-400">{loadError} <button onClick={refresh} className="ml-3 underline">Try again</button></div> : books === null ? (
         <p className="text-sm text-slate-500">Loading…</p>
       ) : books.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-800 py-16 text-center text-slate-500">
@@ -145,7 +160,7 @@ function UploadZone({
       onDrop={(e) => {
         e.preventDefault();
         setDragging(false);
-        if (e.dataTransfer.files.length) onFiles(e.dataTransfer.files);
+        if (!uploading && e.dataTransfer.files.length) onFiles(e.dataTransfer.files);
       }}
       onClick={() => !uploading && inputRef.current?.click()}
       className={`group cursor-pointer rounded-3xl border-2 border-dashed px-8 py-14 text-center transition ${
@@ -153,6 +168,9 @@ function UploadZone({
           ? "border-amber-400 bg-amber-400/5"
           : "border-slate-700 bg-slate-900/40 hover:border-slate-500"
       }`}
+      tabIndex={uploading ? -1 : 0}
+      aria-disabled={uploading}
+      onKeyDown={(e) => { if (!uploading && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); inputRef.current?.click(); } }}
       role="button"
       aria-label="Upload a PDF"
     >
@@ -209,6 +227,13 @@ function BookCard({ book, onDelete }: { book: Book; onDelete: () => void }) {
     }
   };
 
+  if (book.status === "pending") return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+      <p className="truncate text-sm text-white">{book.title}</p>
+      <p className="mt-2 text-xs text-amber-400">Upload unfinished</p>
+      <button onClick={onDelete} className="mt-4 text-sm text-red-400">Delete upload</button>
+    </div>
+  );
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 transition hover:border-slate-600">
       <Link href={`/book/${book.id}`} className="block">
@@ -230,8 +255,8 @@ function BookCard({ book, onDelete }: { book: Book; onDelete: () => void }) {
               {book.hasPassword ? "Password" : "Private"}
             </span>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
-          <div className="absolute inset-x-0 bottom-3 flex justify-center opacity-0 transition group-hover:opacity-100">
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100" />
+          <div className="absolute inset-x-0 bottom-3 flex justify-center opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
             <span className="rounded-full bg-amber-400 px-4 py-1.5 text-xs font-semibold text-slate-950">
               Open flipbook
             </span>
@@ -246,7 +271,7 @@ function BookCard({ book, onDelete }: { book: Book; onDelete: () => void }) {
           </p>
         </div>
       </Link>
-      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
+      <div className="absolute right-2 top-2 flex gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
         <button
           onClick={copyLink}
           className="rounded-full bg-slate-950/80 p-2 text-slate-300 backdrop-blur transition hover:text-amber-400"
