@@ -3,7 +3,8 @@
   "env": {
     "NEXT_PUBLIC_SUPABASE_URL": "https://tujhvzaxwjgzupqzmakx.supabase.co",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1amh2emF4d2pnenVwcXptYWt4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyOTY4NzMsImV4cCI6MjA5ODg3Mjg3M30.WujIMK9-2Rgo5O2kHGw8Xj57jbPlozIh0Ri4ZNvrz7I",
-    "NEXT_PUBLIC_APP_URL": "https://www.flipbookdynamite.com"
+    "NEXT_PUBLIC_APP_URL": "https://www.flipbookdynamite.com",
+    "FLIPBOOK_DATA_DIR": "/tmp/flipbook"
   },
   "build": {
     "env": {
