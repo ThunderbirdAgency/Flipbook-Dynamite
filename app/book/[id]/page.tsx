@@ -55,8 +55,8 @@ export default async function BookPage({ params }: Props) {
             </span>
           </Link>
           <span className="hidden text-slate-700 sm:inline">/</span>
-          <h1 className="truncate text-sm text-slate-300" title={book.title}>
-            {book.title}
+          <h1 className="truncate text-sm text-slate-300" title={decision === "ok" ? book.title : "Protected flipbook"}>
+            {decision === "ok" ? book.title : "Protected flipbook"}
           </h1>
         </div>
       </header>
@@ -64,7 +64,7 @@ export default async function BookPage({ params }: Props) {
         {decision === "ok" ? (
           <BookViewer
             id={book.id}
-            title={book.title}
+            title={decision === "ok" ? book.title : "Protected flipbook"}
             isOwner={canManage}
             visibility={book.visibility}
             hasPassword={book.hasPassword}
@@ -72,7 +72,7 @@ export default async function BookPage({ params }: Props) {
             overlays={book.overlays ?? []}
           />
         ) : decision === "needs-password" ? (
-          <UnlockGate id={book.id} title={book.title} />
+          <UnlockGate id={book.id} title="Protected flipbook" />
         ) : (
           <PrivateNotice />
         )}

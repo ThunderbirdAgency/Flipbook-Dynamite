@@ -10,7 +10,7 @@ type Props = { params: Promise<{ id: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const book = await getBook(id);
-  return { title: book ? book.title : "Not found" };
+  return { title: book ? (book.visibility === "private" || book.hasPassword ? "Protected flipbook" : book.title) : "Not found", robots: { index: false, follow: false } };
 }
 
 // Chrome-free viewer intended for <iframe> embedding on other sites.
@@ -35,7 +35,7 @@ export default async function EmbedPage({ params }: Props) {
           overlays={book.overlays ?? []}
         />
       ) : decision === "needs-password" ? (
-        <UnlockGate id={book.id} title={book.title} />
+        <UnlockGate id={book.id} title="Protected flipbook" />
       ) : (
         <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-slate-400">
           This flipbook is private.

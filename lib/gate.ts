@@ -1,19 +1,14 @@
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { accessCookieName, decideAccess, verifyAccessToken, type AccessDecision } from "./access";
-import { authEnabled, currentUserId } from "./auth";
+import { currentUserId } from "./auth";
 import type { StoredBook } from "./types";
 
 export interface GateResult {
   decision: AccessDecision;
   /** True ownership (a signed-in user whose id matches the book). */
   isOwner: boolean;
-  /**
-   * May configure the book (privacy, insights, rename, delete). In auth mode
-   * this equals ownership; in open mode there are no accounts, so the single
-   * shared user can manage everything. Note: managing is separate from viewing
-   * — password/private books are still gated for viewing in open mode.
-   */
+  /** May configure the book only when the current identity owns it. */
   canManage: boolean;
 }
 
@@ -40,11 +35,11 @@ function gate(
   userId: string | null,
   token: string | undefined
 ): GateResult {
-  const hasValidToken = verifyAccessToken(token, book.id, Date.now());
+  const hasValidToken = verifyAccessToken(token, book.id, Date.now(), book.passwordHash);
   const isOwner = Boolean(userId && userId === book.ownerId);
   return {
     decision: decideAccess(book, userId, hasValidToken),
     isOwner,
-    canManage: authEnabled ? isOwner : true,
+    canManage: isOwner,
   };
 }

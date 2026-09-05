@@ -53,6 +53,7 @@ export interface Book {
   createdAt: string;
   /** Clerk user id of the creator; absent for books made in open mode. */
   ownerId?: string;
+  status: "pending" | "ready" | "deleted";
   /**
    * "public"  — anyone with the link can open it (default).
    * "private" — only the owner, or someone with the password, can open it.
@@ -83,7 +84,7 @@ export function toPublicBook(book: StoredBook): Book {
     fileName: book.fileName,
     size: book.size,
     createdAt: book.createdAt,
-    ownerId: book.ownerId,
+    status: book.status,
     visibility: book.visibility,
     hasPassword: book.hasPassword,
     branding: book.branding ?? {},

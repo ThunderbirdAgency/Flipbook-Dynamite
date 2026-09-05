@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBook } from "@/lib/store";
-import { authEnabled, currentUserId } from "@/lib/auth";
+import { currentUserId } from "@/lib/auth";
 import InsightsClient from "./client";
 
 type Props = { params: Promise<{ id: string }> };
@@ -13,7 +13,7 @@ export default async function InsightsPage({ params }: Props) {
   const book = await getBook(id);
   if (!book) notFound();
 
-  if (authEnabled) {
+  {
     const userId = await currentUserId();
     if (!userId || book.ownerId !== userId) notFound();
   }

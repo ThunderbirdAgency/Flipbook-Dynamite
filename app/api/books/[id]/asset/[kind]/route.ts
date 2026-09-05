@@ -1,13 +1,13 @@
-import { promises as fs } from "fs";
+import { api, assertSameOrigin, readBoundedBody } from "@/lib/http";
 import { NextRequest, NextResponse } from "next/server";
 import {
-  getAssetDelivery,
   getBook,
+  enforceRateLimit,
   readAssetBytes,
   saveAsset,
   updateBook,
 } from "@/lib/store";
-import { authEnabled, currentUserId } from "@/lib/auth";
+import { currentUserId } from "@/lib/auth";
 import { mergeBranding } from "@/lib/branding";
 import { gateBookRequest } from "@/lib/gate";
 import { toPublicBook } from "@/lib/types";
@@ -16,7 +16,7 @@ export const runtime = "nodejs";
 
 type Params = { params: Promise<{ id: string; kind: string }> };
 
-const MAX_ASSET = 5 * 1024 * 1024; // 5 MB
+const MAX_ASSET = 4 * 1024 * 1024; // 4 MB, below Vercel’s request-body limit
 const KIND_RE = /^[A-Za-z0-9_-]{1,60}$/;
 
 // logo/background feed branding fields; any other (safe) kind is a generic
@@ -45,104 +45,81 @@ function sniffImage(buf: Buffer): string | null {
 }
 
 async function canManage(ownerId?: string): Promise<boolean> {
-  if (!authEnabled) return true;
   const userId = await currentUserId();
   return Boolean(userId && ownerId === userId);
 }
 
 export async function GET(req: NextRequest, { params }: Params) {
-  const { id, kind } = await params;
-  if (!KIND_RE.test(kind)) return NextResponse.json({ error: "Bad asset" }, { status: 400 });
+  return api(async () => {
+    const { id, kind } = await params;
+    if (!KIND_RE.test(kind)) return NextResponse.json({ error: "Bad asset" }, { status: 400 });
 
-  const book = await getBook(id);
-  if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const book = await getBook(id);
+    if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Assets of a private/protected book must follow the same gate as the PDF, so
-  // a logo/background can't leak the fact-or-content of a gated book.
-  const gated = book.visibility === "private" || book.hasPassword;
-  if (gated) {
     const { decision } = await gateBookRequest(book, req);
-    if (decision === "denied") return NextResponse.json({ error: "Private" }, { status: 403 });
-    if (decision === "needs-password")
-      return NextResponse.json({ error: "Password required" }, { status: 401 });
-    // Proxy the bytes so we never hand out a public/guessable storage URL.
+    if (decision !== "ok") return NextResponse.json({ error: "Access required" }, { status: decision === "denied" ? 403 : 401 });
     const data = await readAssetBytes(id, kind);
     if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return new NextResponse(new Uint8Array(data), {
-      headers: {
-        "Content-Type": sniffImage(data) || "application/octet-stream",
-        "Content-Length": String(data.length),
-        "Cache-Control": "private, no-store",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
-  }
-
-  // Public book: fast path — filesystem streams; Supabase redirects to CDN.
-  const delivery = await getAssetDelivery(id, kind);
-  if (!delivery) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (delivery.kind === "redirect") return NextResponse.redirect(delivery.url, 307);
-
-  let data: Buffer;
-  try {
-    data = await fs.readFile(delivery.path);
-  } catch {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-  const type = sniffImage(data) || "application/octet-stream";
-  return new NextResponse(new Uint8Array(data), {
-    headers: {
-      "Content-Type": type,
+    return new NextResponse(new Uint8Array(data), { headers: {
+      "Content-Type": sniffImage(data) || "application/octet-stream",
       "Content-Length": String(data.length),
-      "Cache-Control": "public, max-age=3600",
+      "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
-    },
+    } });
   });
 }
 
 export async function POST(req: NextRequest, { params }: Params) {
-  const { id, kind } = await params;
-  if (!KIND_RE.test(kind)) return NextResponse.json({ error: "Bad asset" }, { status: 400 });
+  return api(async () => {
+    assertSameOrigin(req);
+    const { id, kind } = await params;
+    if (!KIND_RE.test(kind)) return NextResponse.json({ error: "Bad asset" }, { status: 400 });
 
-  const book = await getBook(id);
-  if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!(await canManage(book.ownerId))) {
-    return NextResponse.json({ error: "Not your book" }, { status: 403 });
-  }
+    const book = await getBook(id);
+    if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!(await canManage(book.ownerId))) {
+      return NextResponse.json({ error: "Not your book" }, { status: 403 });
+    }
 
-  const buffer = Buffer.from(await req.arrayBuffer());
-  if (buffer.length === 0) return NextResponse.json({ error: "Empty file" }, { status: 400 });
-  if (buffer.length > MAX_ASSET) {
-    return NextResponse.json({ error: "Image exceeds the 5 MB limit" }, { status: 413 });
-  }
-  const contentType = sniffImage(buffer);
-  if (!contentType) {
-    return NextResponse.json({ error: "Not a supported image" }, { status: 415 });
-  }
+    await enforceRateLimit(`images:${book.ownerId}`, 60, 3600);
+    const buffer = Buffer.from(await readBoundedBody(req, MAX_ASSET));
+    if (buffer.length === 0) return NextResponse.json({ error: "Empty file" }, { status: 400 });
+    if (buffer.length > MAX_ASSET) {
+      return NextResponse.json({ error: "Image exceeds the 4 MB limit" }, { status: 413 });
+    }
+    const contentType = sniffImage(buffer);
+    if (!contentType) {
+      return NextResponse.json({ error: "Not a supported image" }, { status: 415 });
+    }
 
-  const url = await saveAsset(id, kind, buffer, contentType);
-  const field = brandingField(kind);
-  if (field) {
-    const branding = mergeBranding(book.branding ?? {}, { [field]: url });
-    const updated = await updateBook(id, { branding });
-    return NextResponse.json({ url, book: updated ? toPublicBook(updated) : null });
-  }
-  // Generic asset (overlay image/GIF) — just hand back the URL.
-  return NextResponse.json({ url, book: toPublicBook(book) });
+    const url = await saveAsset(id, kind, buffer, contentType);
+    const field = brandingField(kind);
+    if (field) {
+      const branding = mergeBranding(book.branding ?? {}, { [field]: url });
+      const updated = await updateBook(id, { branding });
+      return NextResponse.json({ url, book: updated ? toPublicBook(updated) : null });
+    }
+    // Generic asset (overlay image/GIF) — just hand back the URL.
+    return NextResponse.json({ url, book: toPublicBook(book) });
+  });
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const { id, kind } = await params;
-  const field = brandingField(kind);
-  if (!field) return NextResponse.json({ error: "Bad asset" }, { status: 400 });
+  return api(async () => {
+    assertSameOrigin(_req);
+    const { id, kind } = await params;
+    const field = brandingField(kind);
+    if (!field) return NextResponse.json({ error: "Bad asset" }, { status: 400 });
 
-  const book = await getBook(id);
-  if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!(await canManage(book.ownerId))) {
-    return NextResponse.json({ error: "Not your book" }, { status: 403 });
-  }
+    const book = await getBook(id);
+    if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!(await canManage(book.ownerId))) {
+      return NextResponse.json({ error: "Not your book" }, { status: 403 });
+    }
 
-  const branding = mergeBranding(book.branding ?? {}, { [field]: null });
-  const updated = await updateBook(id, { branding });
-  return NextResponse.json({ book: updated ? toPublicBook(updated) : null });
+    const branding = mergeBranding(book.branding ?? {}, { [field]: null });
+    const updated = await updateBook(id, { branding });
+    return NextResponse.json({ book: updated ? toPublicBook(updated) : null });
+  });
 }

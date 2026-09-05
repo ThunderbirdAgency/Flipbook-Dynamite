@@ -4,7 +4,7 @@ import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 export const metadata = {
   title: "Pricing — Flipbook Dynamite",
   description:
-    "Straightforward plans for turning PDFs into interactive, brandable flipbooks. Free to start; upgrade for video layers, branding, analytics, and white-label.",
+    "Preview the planned Flipbook Dynamite plans. Paid subscriptions are not available yet.",
 };
 
 interface Plan {
@@ -40,7 +40,7 @@ const PLANS: Plan[] = [
     price: 29,
     cadence: "/mo",
     tagline: "For the occasional flipbook.",
-    cta: "Choose Starter",
+    cta: "Coming soon",
     features: [
       "10 flipbooks",
       "Custom background, logo & accent",
@@ -56,7 +56,7 @@ const PLANS: Plan[] = [
     cadence: "/mo",
     tagline: "Video, branding & analytics.",
     featured: true,
-    cta: "Choose Professional",
+    cta: "Coming soon",
     features: [
       "Unlimited flipbooks",
       "Video / GIF / iframe interactive layers",
@@ -71,7 +71,7 @@ const PLANS: Plan[] = [
     price: 179,
     cadence: "/mo",
     tagline: "White-label & unlimited.",
-    cta: "Choose Business",
+    cta: "Coming soon",
     features: [
       "Remove Flipbook Dynamite branding",
       "Custom domain",
@@ -97,7 +97,7 @@ const FAQ = [
   },
   {
     q: "Can I change plans later?",
-    a: "Anytime. Upgrade or downgrade whenever; your published books keep working.",
+    a: "Paid plans are coming soon. Upgrades and downgrades are not available during the preview.",
   },
 ];
 
@@ -105,6 +105,7 @@ export default function PricingPage() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
       <SiteHeader active="pricing" />
+      <p role="status" className="mx-auto mt-6 max-w-4xl rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-center text-sm text-amber-200">Pricing preview: these are planned plans and limits. Paid subscriptions are not available yet. The current preview includes up to 100 flipbooks and 1 GB of PDF storage per account.</p>
 
       <section className="mx-auto w-full max-w-6xl px-6 pt-16 text-center">
         <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">

@@ -1,18 +1,28 @@
+import { configuration } from "@/lib/config";
 import Link from "next/link";
 import { SignInButton, UserButton } from "@clerk/nextjs";
 import Library from "@/components/Library";
 import { authEnabled, currentUserId } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = { title: "Your library — Flipbook Dynamite" };
 
 // The app backend: a signed-in creator's library. Marketing lives at "/".
 export default async function AppPage() {
+  if (!configuration().ready) return (
+    <main className="min-h-screen bg-slate-950 px-6 py-24 text-center text-white">
+      <h1 className="text-2xl font-semibold">We’re preparing your workspace</h1>
+      <p className="mt-3 text-slate-400">Flipbook Dynamite isn’t accepting uploads yet. Please check back soon.</p>
+      <Link href="/" className="mt-6 inline-block text-amber-400">Back to home</Link>
+    </main>
+  );
   const userId = await currentUserId();
   const showLibrary = !authEnabled || Boolean(userId);
 
   return (
     <main className="min-h-screen bg-slate-950">
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
+      <header className="mx-auto flex w-full max-w-[1500px] items-center justify-between px-6 py-6">
         <Link href="/app" className="flex items-center gap-2.5">
           <Logo />
           <span className="text-lg font-bold tracking-tight text-white">
@@ -38,15 +48,6 @@ export default async function AppPage() {
             ))}
         </div>
       </header>
-
-      <section className="mx-auto w-full max-w-6xl px-6 pb-10 pt-6">
-        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-          Your flipbooks
-        </h1>
-        <p className="mt-1.5 text-sm text-slate-400">
-          Upload a PDF and it becomes an interactive, brandable, shareable flipbook.
-        </p>
-      </section>
 
       {showLibrary ? (
         <Library />
