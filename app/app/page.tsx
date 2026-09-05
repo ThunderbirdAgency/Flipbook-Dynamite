@@ -22,7 +22,7 @@ export default async function AppPage() {
 
   return (
     <main className="min-h-screen bg-slate-950">
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
+      <header className="mx-auto flex w-full max-w-[1500px] items-center justify-between px-6 py-6">
         <Link href="/app" className="flex items-center gap-2.5">
           <Logo />
           <span className="text-lg font-bold tracking-tight text-white">
@@ -48,15 +48,6 @@ export default async function AppPage() {
             ))}
         </div>
       </header>
-
-      <section className="mx-auto w-full max-w-6xl px-6 pb-10 pt-6">
-        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-          Your flipbooks
-        </h1>
-        <p className="mt-1.5 text-sm text-slate-400">
-          Upload a PDF and it becomes an interactive, brandable, shareable flipbook.
-        </p>
-      </section>
 
       {showLibrary ? (
         <Library />

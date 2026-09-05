@@ -14,13 +14,19 @@ Updated 2026-09-05. This document replaces the outdated July setup instructions.
 
 ## Verified infrastructure state
 
-Read-only inspection on September 5 found no books and no stored objects.
-`flipbook-pdfs` is private; `flipbook-assets` is still public and must become private
-with this release. Books/events have RLS and no client policies, intentionally:
-all privileged operations run on the server with a service-role key.
-No live schema changes have been made. GitHub automatically deployed the candidate
-to a Vercel preview, and its CI checks passed. The preview is not yet configured for
-real sign-in or uploads.
+The initial inspection found no books or stored objects. The owner has since signed
+in successfully and created two pending uploads. Both failed before bytes were sent:
+Storage returned 400 when the app declared JSON but sent an empty signing-request
+body. The request now sends `{}`, with a regression test for the parsing failure.
+
+The `release_readiness` migration was applied through Supabase MCP on September 5.
+Both PDF and image buckets are private. Client roles have no metadata grants;
+privileged operations run on the server. The `creator_workspace` migration was
+also applied: private account folders, placements, and owner-scoped view summaries.
+Its tested SQL is in `tests/fixtures/workspace-schema.sql`. The original readiness
+SQL is in `tests/fixtures/readiness-schema.sql`; the remote migration history is the
+authoritative application record. Local migration-file generation remains blocked
+by the previously cancelled CLI network approval; do not invent timestamp filenames.
 
 Authenticated Vercel inspection confirmed the existing project:
 
@@ -43,15 +49,16 @@ Authenticated Vercel inspection confirmed the existing project:
   An unused `NEXT_CLERK_PUBLISHABLE_KEY` entry was also entered by the owner; the app
   uses the correctly named `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` entry.
   No new Clerk application or paid plan was created.
-- The existing Supabase service-role credential still needs to be added securely to
-  the project. Do not paste credentials into a chat, document, or commit.
+- The owner saved `SUPABASE_SERVICE_ROLE_KEY` securely. It is scoped to Preview.
+  A deployed request confirmed server access to Supabase after the readiness migration.
+  Never paste credentials into a chat, document, or commit.
 - `flipbookdynamite.com` is attached to this Vercel project. GoDaddy still controls
   DNS and serves its existing parking records. No DNS or nameserver changes made.
   Vercel currently recommends two apex A records: `216.150.1.1` and `216.150.16.1`.
   Reverify these recommendations at launch; defer the DNS cutover until validation.
 
-Existing migration history: initialization, July access hardening, branding, overlays.
-The new SQL has been tested locally but has NOT been applied to the live project.
+Migration history now includes release readiness and the creator workspace.
+The database permission checks and 12 regression/lifecycle/schema tests passed.
 
 ## Changes in the candidate
 
@@ -82,21 +89,17 @@ The new SQL has been tested locally but has NOT been applied to the live project
 1. Use the existing linked Vercel project identified above. The connected app's empty
    project list was misleading; authenticated CLI inspection works. Do not create a
    duplicate project.
-2. Finish connecting the owner's existing Clerk application and configure the
-   remaining required values from `.env.example` in
-   Vercel's intended environments. Store service-role, Clerk, and signing secrets only
-   as protected server settings. The browser does not need a Supabase anon key.
-3. Generate a migration using `supabase migration new release_readiness`. Put the
-   reviewed SQL from `tests/fixtures/readiness-schema.sql` into that generated file.
-   A CLI binary is present, but its execution was blocked with "network approval was
-   cancelled before a decision was returned." The SQL remains a tested draft fixture,
-   not a generated migration.
-4. Recheck live data and apply the migration to the dedicated project. Preserve all
-   existing columns and features. Verify both buckets are private, client roles cannot
-   access metadata/objects, reservations work, and security advisors show no new risks.
-5. Redeploy this candidate to its Vercel preview with the complete environment. Existing
-   deployments need the new code alongside the image bucket change. Do not route
-   customers to a partially configured version.
+2. Preview keys are configured; production Clerk and Supabase credentials remain to
+   be configured before launch. Keep development Clerk keys out of production.
+3. Both prepared database changes are applied and tested. Preserve live user data.
+4. Deploy the creator portal candidate with private folders, list/grid views, search,
+   sorting, CSV export, per-book views, rename, branding, sharing/privacy, and analytics.
+5. Run `node --conditions=react-server --import tsx scripts/verify-cloud-storage.ts`
+   only inside the configured Vercel preview environment. It uses stored credentials
+   internally and prints only stage results. It verifies real signed upload,
+   finalization, byte-identical private download, analytics, image storage, folder
+   persistence/ownership and cleanup using its own synthetic owner. It never prints
+   keys or signed URLs. This does not replace browser sign-in and large-PDF testing.
 6. Confirm the authenticated nightly `/api/maintenance` job runs and expired upload
    reservations are cleared. Exercise real Clerk sign-up/sign-in/sign-out, two distinct creator accounts,
    direct storage uploads, private/password books, revoked passwords, image overlays,
@@ -105,8 +108,9 @@ The new SQL has been tested locally but has NOT been applied to the live project
 
 ## Remaining launch/product decisions
 
-- Real Clerk/Supabase/Vercel end-to-end validation is outstanding. Local tests use a
-  demo identity; cloud transport tests use mocks. This is not a penetration test.
+- The owner has confirmed real Clerk sign-in through the creator page. Browser upload,
+  viewer, privacy, and mobile acceptance still need testing after the upload fix.
+  The opt-in live server verification is separate from browser acceptance.
 - Clerk provider placement and the explicit `/__clerk/:path*` matcher were updated
   to match the supplied setup instructions. The marketing header now shows a
   profile control and library link for signed-in users. TypeScript and ESLint pass.
