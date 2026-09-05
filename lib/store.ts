@@ -20,8 +20,12 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export const supabaseMode = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+// Supabase mode requires the service-role key: all privileged work (table
+// writes, signed storage URLs) runs through it, and without it the anon key is
+// locked out by RLS. If it's missing we fall back to filesystem/open mode
+// rather than a half-working Supabase, so a keyless deploy still runs.
 export const hasServiceRole = Boolean(SUPABASE_SERVICE_KEY);
+export const supabaseMode = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_SERVICE_KEY);
 
 /** Key used for server-side privileged calls: service role if present. */
 const PRIVILEGED_KEY = SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY;
