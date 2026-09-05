@@ -12,6 +12,8 @@ export interface Workspace {
   views: Record<string, number>;
   reservedBytes: number;
   bookSlots: number;
+  storageLimitBytes?: number;
+  publicationLimit?: number;
 }
 export interface WorkspaceChange { action: "create" | "rename" | "delete" | "move"; folder?: string | null; label?: string; book?: string }
 const empty = (): Workspace => ({ folders: [], placements: {}, views: {}, reservedBytes: 0, bookSlots: 0 });

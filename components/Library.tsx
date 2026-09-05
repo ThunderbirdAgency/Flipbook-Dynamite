@@ -79,7 +79,13 @@ export default function Library() {
     const data = await request("/api/books","POST",{fileName:file.name,size:file.size});
     setStage(`Uploading ${label}`);
     const up = await fetch(data.upload.url,{method:data.upload.method,headers:{...data.upload.headers,"Content-Type":"application/pdf"},body:file});
-    if(!up.ok) throw new Error(`Storage could not accept ${file.name}. Remove the unfinished upload and try again.`);
+    if(!up.ok) {
+     const reason = await up.json().catch(()=>({}));
+     const tooLarge = up.status === 413 || String(reason.statusCode) === "413" || /size|too.large|exceed/i.test(String(reason.message || reason.error || ""));
+     throw new Error(tooLarge
+      ? `The storage provider rejected ${file.name} because of its file-size limit. The project-wide storage limit must allow 100 MB PDFs. Delete this unfinished upload before retrying after the limit is corrected.`
+      : `Storage could not accept ${file.name} (HTTP ${up.status}). Delete this unfinished upload before retrying.`);
+    }
     setStage(`Verifying ${label}`);
     await request(`/api/books/${data.book.id}/complete`,"POST");
     if(workspace?.folders.some(f=>f.id === scope)) await request("/api/workspace","POST",{action:"move",book:data.book.id,folder:scope});
@@ -117,7 +123,7 @@ export default function Library() {
    <button onClick={()=>uploadRef.current?.scrollIntoView({behavior:"smooth",block:"center"})} className="rounded-xl bg-amber-400 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-amber-300">＋ Upload PDF</button>
   </div>
   <div className="mb-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
-   {[["Published flipbooks",String(all.filter(b=>b.status === "ready").length)],["Total views",String(Object.values(views).reduce((n,v)=>n+v,0))],["Client folders",String(folders.length)],["PDF storage reserved",`${((workspace?.reservedBytes || 0)/1073741824*100).toFixed(0)}%`]].map(([label,value])=><div key={label} className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4"><p className="text-xs text-slate-400">{label}</p><p className="mt-2 text-2xl font-semibold tabular-nums text-white">{books === null ? "—" : value}</p></div>)}
+   {[["Published flipbooks",String(all.filter(b=>b.status === "ready").length)],["Total views",String(Object.values(views).reduce((n,v)=>n+v,0))],["Client folders",String(folders.length)],["PDF storage reserved",`${((workspace?.reservedBytes || 0)/(workspace?.storageLimitBytes || 1073741824)*100).toFixed(0)}%`]].map(([label,value])=><div key={label} className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4"><p className="text-xs text-slate-400">{label}</p><p className="mt-2 text-2xl font-semibold tabular-nums text-white">{books === null ? "—" : value}</p></div>)}
   </div>
   <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
    <aside className="self-start rounded-2xl border border-slate-800 bg-slate-900/40 p-3 lg:sticky lg:top-5">
@@ -130,7 +136,7 @@ export default function Library() {
      {!folders.length && <p className="px-3 py-2 text-xs leading-5 text-slate-500">Organize publications by client, listing, or project.</p>}
     </div>
     <button onClick={()=>openForm({kind:"folder",name:""})} className="mt-3 w-full rounded-lg border border-dashed border-slate-700 py-2 text-xs text-slate-400 hover:text-white">＋ New folder</button>
-    <div className="mt-6 border-t border-slate-800 px-3 pt-4 text-xs leading-5 text-slate-500"><p>{workspace?.bookSlots || 0} / 100 publication slots</p><p className="mt-2">Uploads reserve up to 100 MB each while their upload links are active. Storage limit: 1 GB.</p></div>
+    <div className="mt-6 border-t border-slate-800 px-3 pt-4 text-xs leading-5 text-slate-500"><p>{workspace?.bookSlots || 0} / {workspace?.publicationLimit || 100} publication slots</p><p className="mt-2">Uploads reserve up to 100 MB each while their upload links are active. Storage allowance: {formatSize(workspace?.storageLimitBytes || 1073741824)}. Deleted uploads may temporarily reserve space until their upload links expire.</p></div>
    </aside>
    <section className="min-w-0">
     <div ref={uploadRef}><UploadZone onFiles={upload} uploading={uploading} /></div>
@@ -146,7 +152,7 @@ export default function Library() {
       <div className="mt-3 flex flex-wrap items-center gap-2"><select aria-label={`Folder for ${book.title}`} disabled={busy} value={placements[book.id] || ""} onChange={e=>move(book.id,e.target.value)} className="max-w-44 rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-400"><option value="">Unfiled</option>{folders.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select><span className="text-xs tabular-nums text-slate-500">{book.status === "ready" ? `${views[book.id] || 0} views` : "PDF not published"}</span></div>
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
        {book.status === "ready" ? <><Link href={`/book/${book.id}`} className="font-medium text-amber-400">Open / edit</Link><button onClick={()=>setBranding(book)} className="text-slate-300">Branding</button><button onClick={()=>setShare(book)} className="text-slate-300">Share & privacy</button><Link href={`/book/${book.id}/insights`} className="text-slate-300">Analytics</Link><button onClick={()=>openForm({kind:"renameBook",id:book.id,name:book.title})} className="text-slate-400">Rename</button><a href={`/api/books/${book.id}/pdf?download=1`} className="text-slate-400">PDF ↓</a></> : <button disabled={busy} onClick={()=>complete(book)} className="text-amber-400">Check upload</button>}
-       <button disabled={busy} onClick={()=>openForm({kind:"deleteBook",id:book.id,name:book.title})} className="text-red-400">{book.status === "pending" ? "Remove upload" : "Delete"}</button>
+       <button disabled={busy} onClick={()=>openForm({kind:"deleteBook",id:book.id,name:book.title})} aria-label={`Delete ${book.title}`} className="rounded-lg border border-red-500/30 px-3 py-2 text-red-300 hover:bg-red-500/10">{book.status === "pending" ? "Delete unfinished upload" : "Delete flipbook"}</button>
       </div></div>
      </article>)}
     </div>}

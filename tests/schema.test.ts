@@ -67,5 +67,23 @@ test("PostgreSQL migration preserves books, denies direct anonymous access, and 
     await db.query("update public.flipbook_books set status='deleted' where owner_id='quota-user'");
     await assert.rejects(db.query("select public.flipbook_reserve_upload('tombstone00','Book','book.pdf',1,'quota-user')"), /library_limit/);
     await db.exec("reset role");
+    await db.exec(await readFile(new URL("./fixtures/workspace-schema.sql", import.meta.url), "utf8"));
+    await db.exec(await readFile(new URL("./fixtures/capacity-schema.sql", import.meta.url), "utf8"));
+    for (const role of ["anon", "authenticated"]) {
+      await db.exec("set role " + role);
+      await assert.rejects(db.query("select * from public.flipbook_account_limits"));
+      await assert.rejects(db.query("insert into public.flipbook_account_limits values ('self',100000000000,1000)"));
+      await db.exec("reset role");
+    }
+    await db.exec("set role service_role");
+    await assert.rejects(db.query("select public.flipbook_reserve_upload('defaultcap1','Book','book.pdf',1,'quota-user')"), /library_limit/);
+    await db.query("insert into public.flipbook_account_limits values ('quota-user',107374182400,1000)");
+    await db.query("select public.flipbook_reserve_upload('raisedcap01','Book','book.pdf',71586760,'quota-user')");
+    const limits = (await db.query<{w:{storageLimitBytes:number;publicationLimit:number}}>("select public.flipbook_workspace('quota-user') as w")).rows[0].w;
+    assert.equal(limits.storageLimitBytes,107374182400);
+    assert.equal(limits.publicationLimit,1000);
+    const defaults = (await db.query<{w:{storageLimitBytes:number}}>("select public.flipbook_workspace('other') as w")).rows[0].w;
+    assert.equal(defaults.storageLimitBytes,1073741824);
+    await db.exec("reset role");
   } finally { await db.close(); }
 });
