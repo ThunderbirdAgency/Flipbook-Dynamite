@@ -34,14 +34,18 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const page = (
+  return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {authEnabled ? (
+          <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up">
+            {children}
+          </ClerkProvider>
+        ) : children}
+      </body>
     </html>
   );
-  // ClerkProvider only mounts when auth is configured; open mode skips it.
-  return authEnabled ? <ClerkProvider>{page}</ClerkProvider> : page;
 }

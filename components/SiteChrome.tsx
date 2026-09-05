@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { authEnabled } from "@/lib/auth";
+import AccountControls from "./AccountControls";
 
 // Marketing-site header/footer. Auth-aware: with Clerk on, CTAs go to the
 // hosted sign-in/up pages; in open mode they drop straight into the app.
@@ -15,7 +16,7 @@ export function Wordmark({ className = "" }: { className?: string }) {
           <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
         </svg>
       </span>
-      <span className="text-lg font-bold tracking-tight text-white">
+      <span className="text-sm font-bold tracking-tight text-white sm:text-lg">
         Flipbook <span className="text-amber-400">Dynamite</span>
       </span>
     </Link>
@@ -25,7 +26,7 @@ export function Wordmark({ className = "" }: { className?: string }) {
 export function SiteHeader({ active }: { active?: "features" | "pricing" }) {
   return (
     <header className="sticky top-0 z-40 border-b border-white/5 bg-slate-950/80 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-3.5">
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-4 py-3.5 sm:px-6">
         <Wordmark />
         <nav className="hidden items-center gap-7 text-sm text-slate-300 md:flex">
           <Link
@@ -45,18 +46,7 @@ export function SiteHeader({ active }: { active?: "features" | "pricing" }) {
           </Link>
         </nav>
         <div className="flex items-center gap-2">
-          <Link
-            href={loginHref}
-            className="rounded-full px-4 py-2 text-sm font-medium text-slate-200 transition hover:text-white"
-          >
-            Log in
-          </Link>
-          <Link
-            href={startHref}
-            className="rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-300"
-          >
-            Start free
-          </Link>
+          <AccountControls enabled={authEnabled} />
         </div>
       </div>
     </header>

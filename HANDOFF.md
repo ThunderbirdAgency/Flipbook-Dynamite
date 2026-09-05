@@ -33,9 +33,16 @@ Authenticated Vercel inspection confirmed the existing project:
 - Initially no application environment variables or integration resources existed.
   Production app URL/Supabase URL and fresh signing/cron secrets have now been added.
   The release preview has its own signing/cron secrets, restricted to that branch.
-- Clerk provisioning on the free Hobby plan is awaiting the owner's Marketplace
-  terms acceptance. The CLI returned `integration_terms_acceptance_required`; no
-  Clerk resource or paid plan was created.
+- The owner approved Clerk Marketplace terms and supplied the existing application
+  `app_3ItlzmYtbb0FNLZm8rvOJGCC8rD`. Use this app rather than provisioning another.
+  Clerk CLI was installed, but its browser login could not be completed. The owner
+  chose direct Vercel configuration instead. The development publishable key is now
+  stored as Config, and the owner entered `CLERK_SECRET_KEY` as Secret. Both target
+  Preview and Development; the secret was initially scoped to Production and was
+  moved without reading its value. Production Clerk keys remain outstanding.
+  An unused `NEXT_CLERK_PUBLISHABLE_KEY` entry was also entered by the owner; the app
+  uses the correctly named `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` entry.
+  No new Clerk application or paid plan was created.
 - The existing Supabase service-role credential still needs to be added securely to
   the project. Do not paste credentials into a chat, document, or commit.
 - `flipbookdynamite.com` is attached to this Vercel project. GoDaddy still controls
@@ -75,7 +82,7 @@ The new SQL has been tested locally but has NOT been applied to the live project
 1. Use the existing linked Vercel project identified above. The connected app's empty
    project list was misleading; authenticated CLI inspection works. Do not create a
    duplicate project.
-2. Finish Clerk Marketplace terms acceptance and provisioning, then configure the
+2. Finish connecting the owner's existing Clerk application and configure the
    remaining required values from `.env.example` in
    Vercel's intended environments. Store service-role, Clerk, and signing secrets only
    as protected server settings. The browser does not need a Supabase anon key.
@@ -100,6 +107,11 @@ The new SQL has been tested locally but has NOT been applied to the live project
 
 - Real Clerk/Supabase/Vercel end-to-end validation is outstanding. Local tests use a
   demo identity; cloud transport tests use mocks. This is not a penetration test.
+- Clerk provider placement and the explicit `/__clerk/:path*` matcher were updated
+  to match the supplied setup instructions. The marketing header now shows a
+  profile control and library link for signed-in users. TypeScript and ESLint pass.
+  `clerk doctor` could not finish because its network approval was cancelled; do
+  not report that diagnostic or a real sign-in workflow as passed.
 - Signed download links remain usable until their expiry after a privacy/password
   change. Previously downloaded material cannot be recalled.
 - Signed upload links last up to two hours. Every recently created cloud book
