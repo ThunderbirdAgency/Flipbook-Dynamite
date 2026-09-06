@@ -47,8 +47,13 @@ test("complete PDF lifecycle, ownership, private content, and failure recovery",
     assert.equal(delivery.headers.get("cache-control"), "private, no-store");
     assert.deepEqual(new Uint8Array(await delivery.arrayBuffer()), bytes);
     assert.equal((await upload(new NextRequest("https://flip.example" + target.url, { method: "PUT", body: bytes }), context)).status, 409);
-    assert.equal((await update(request("PATCH", { title: "Open House Guide", branding: { accent: "#abcdef" }, overlays: [{ id: "tour", type: "link", url: "https://example.com", page: 1 }] }), context)).status, 200);
+    assert.equal((await update(request("PATCH", { title: "Open House Guide", branding: { accent: "#abcdef", pageSound: false, showThumbnails: true }, overlays: [{ id: "tour", type: "link", url: "https://example.com", page: 1 }] }), context)).status, 200);
     assert.equal((await getBook(book.id))?.branding.accent, "#abcdef");
+    assert.equal((await getBook(book.id))?.branding.pageSound, false);
+    assert.equal((await getBook(book.id))?.branding.showThumbnails, true);
+    await update(request("PATCH", { branding: { pageSound: "false", showThumbnails: 0 } }), context);
+    assert.equal((await getBook(book.id))?.branding.pageSound, false);
+    assert.equal((await getBook(book.id))?.branding.showThumbnails, true);
     assert.equal((await getBook(book.id))?.overlays[0].id, "tour");
     const assetContext = { params: Promise.resolve({ id: book.id, kind: "logo" }) };
     assert.equal((await imageUpload(new NextRequest("https://flip.example", { method: "POST", body: "<svg><script>alert(1)</script></svg>" }), assetContext)).status, 415);

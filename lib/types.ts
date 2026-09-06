@@ -43,6 +43,9 @@ export interface Branding {
   seoDescription?: string;
   /** Whether the viewer shows the download button (default true). */
   allowDownload?: boolean;
+  /** Initial reader preferences; visitors can still change these. */
+  pageSound?: boolean;
+  showThumbnails?: boolean;
 }
 
 export interface Book {

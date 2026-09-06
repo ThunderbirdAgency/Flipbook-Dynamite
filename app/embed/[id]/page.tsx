@@ -5,7 +5,7 @@ import { gateBookRSC } from "@/lib/gate";
 import FlipbookViewer from "@/components/FlipbookViewer";
 import UnlockGate from "@/components/UnlockGate";
 
-type Props = { params: Promise<{ id: string }> };
+type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ preview?: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
@@ -14,12 +14,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 // Chrome-free viewer intended for <iframe> embedding on other sites.
-export default async function EmbedPage({ params }: Props) {
+export default async function EmbedPage({ params, searchParams }: Props) {
   const { id } = await params;
   const book = await getBook(id);
   if (!book) notFound();
 
-  const { decision } = await gateBookRSC(book);
+  const { decision, canManage } = await gateBookRSC(book);
+  const isPreview = canManage && (await searchParams).preview === "1";
 
   return (
     <div className="h-screen bg-slate-950">
@@ -28,7 +29,7 @@ export default async function EmbedPage({ params }: Props) {
           pdfUrl={`/api/books/${id}/pdf`}
           title={book.title}
           downloadUrl={`/api/books/${id}/pdf?download=1`}
-          bookId={id}
+          bookId={isPreview ? undefined : id}
           visibility={book.visibility}
           hasPassword={book.hasPassword}
           branding={book.branding ?? {}}

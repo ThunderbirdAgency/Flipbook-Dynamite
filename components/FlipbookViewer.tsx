@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PageFlip } from "page-flip";
 import { renderPdfToPages, OutlineItem, RenderedPage } from "@/lib/pdf-client";
-import { FLIP_DURATION_MS, playFlipSound, prepareFlipSound } from "@/lib/flip-sound";
+import { FLIP_DURATION_MS, playFlipSound, playDragSound, prepareFlipSound } from "@/lib/flip-sound";
 import ShareDialog from "@/components/ShareDialog";
 import BrandingDialog from "@/components/BrandingDialog";
 import ZoomOverlay from "@/components/ZoomOverlay";
@@ -72,11 +72,14 @@ export default function FlipbookViewer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
-  const [showThumbs, setShowThumbs] = useState(false);
+  const [showThumbs, setShowThumbs] = useState(branding.showThumbnails === true);
   const [showToc, setShowToc] = useState(false);
   const [autoplay, setAutoplay] = useState(false);
   const [muted, setMuted] = useState(
-    () => typeof window !== "undefined" && localStorage.getItem("fbd-muted") === "1"
+    () => {
+      const preference = typeof window !== "undefined" ? localStorage.getItem("fbd-muted") : null;
+      return preference === null ? branding.pageSound === false : preference === "1";
+    }
   );
   // Two-page spread on desktop, single page on phones — the spread is what
   // reads as a real bound book. Re-init the engine when we cross the breakpoint.
@@ -101,6 +104,15 @@ export default function FlipbookViewer({
   const flipRef = useRef<PageFlip | null>(null);
   // Mirror for event handlers registered once at PageFlip init.
   const mutedRef = useRef(muted);
+  const pullingRef = useRef(false);
+  const lastRustleRef = useRef(0);
+  const rustleWhilePulling = () => {
+    if (!pullingRef.current || mutedRef.current) return;
+    const now = performance.now();
+    if (now - lastRustleRef.current < 140) return;
+    lastRustleRef.current = now;
+    playDragSound();
+  };
   useEffect(() => {
     mutedRef.current = muted;
   }, [muted]);
@@ -207,8 +219,12 @@ export default function FlipbookViewer({
         reportEventRef.current("page", index + 1);
       });
       flip.on("changeState", (e) => {
-        // "flipping" fires when a page-turn animation starts.
-        if (e.data === "flipping" && !mutedRef.current) playFlipSound();
+        // Pulling is separate from click/keyboard turns; corner hover stays silent.
+        pullingRef.current = e.data === "user_fold";
+        if (!mutedRef.current) {
+          if (e.data === "flipping") playFlipSound();
+          if (e.data === "user_fold") { lastRustleRef.current = performance.now(); playDragSound(); }
+        }
       });
       flipRef.current = flip;
       setCurrent(flip.getCurrentPageIndex());
@@ -216,6 +232,7 @@ export default function FlipbookViewer({
 
     return () => {
       disposed = true;
+      pullingRef.current = false;
       flipRef.current = null;
       try {
         flip?.destroy();
@@ -289,6 +306,9 @@ export default function FlipbookViewer({
   return (
     <div
       ref={containerRef}
+      onPointerMoveCapture={rustleWhilePulling}
+      onTouchMoveCapture={rustleWhilePulling}
+      onPointerCancel={() => { pullingRef.current = false; }}
       onPointerDownCapture={() => { if (!mutedRef.current) prepareFlipSound(); }}
       onKeyDownCapture={() => { if (!mutedRef.current) prepareFlipSound(); }}
       className="relative flex h-full w-full flex-col overflow-hidden bg-slate-950"

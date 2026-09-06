@@ -68,5 +68,10 @@ export function mergeBranding(current: Branding, patch: BrandingPatch): Branding
   if ("allowDownload" in patch)
     apply("allowDownload", true, typeof patch.allowDownload === "boolean" ? patch.allowDownload : undefined);
 
+  for (const key of ["pageSound", "showThumbnails"] as const) {
+    if (key in patch && (typeof patch[key] === "boolean" || patch[key] === null))
+      apply(key, true, patch[key] === null ? undefined : patch[key] as boolean);
+  }
+
   return next;
 }

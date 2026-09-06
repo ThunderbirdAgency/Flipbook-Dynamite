@@ -76,3 +76,9 @@ export function playFlipSound() {
   // Softer, lower tail: the page settling down.
   swish(ctx, now + duration * 0.65, duration * 0.35, 1800, 450, 0.06);
 }
+
+/** A short rustle while the reader physically pulls a page. */
+export function playDragSound() {
+  const ctx = getContext();
+  if (ctx) swish(ctx, ctx.currentTime, 0.18, 600, 1500, 0.075);
+}

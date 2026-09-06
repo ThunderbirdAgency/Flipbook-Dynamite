@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Branding } from "@/lib/types";
 
 interface Props {
@@ -12,6 +12,16 @@ interface Props {
 }
 
 export default function BrandingDialog({ open, onClose, bookId, branding, onChange }: Props) {
+  const [tab, setTab] = useState("appearance");
+  const [previewVersion, setPreviewVersion] = useState(0);
+  const [pageSound, setPageSound] = useState(branding.pageSound !== false);
+  const [showThumbnails, setShowThumbnails] = useState(branding.showThumbnails === true);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (open) dialog?.showModal();
+    return () => dialog?.close();
+  }, [open]);
   const [bgColor, setBgColor] = useState(branding.bgColor || "#101521");
   const [accent, setAccent] = useState(branding.accent || "#fbbf24");
   const [logoLink, setLogoLink] = useState(branding.logoLink || "");
@@ -43,6 +53,7 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
       }
       const data = await res.json();
       if (data.book?.branding) onChange(data.book.branding as Branding);
+      setPreviewVersion(v => v + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -55,7 +66,11 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
     try {
       const res = await fetch(`/api/books/${bookId}/asset/${kind}`, { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Could not remove this image.");
       if (data.book?.branding) onChange(data.book.branding as Branding);
+      setPreviewVersion(v => v + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not remove this image.");
     } finally {
       setBusyAsset("");
     }
@@ -77,6 +92,8 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
             seoTitle: seoTitle.trim() || null,
             seoDescription: seoDescription.trim() || null,
             allowDownload,
+            pageSound,
+            showThumbnails,
           },
         }),
       });
@@ -87,6 +104,7 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
       const data = await res.json();
       if (data.book?.branding) onChange(data.book.branding as Branding);
       setStatus("saved");
+      setPreviewVersion(v => v + 1);
       setTimeout(() => setStatus("idle"), 2000);
     } catch (e) {
       setStatus("error");
@@ -97,22 +115,15 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Customize branding"
-    >
-      <div
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <dialog ref={dialogRef} onCancel={(e) => { e.preventDefault(); onClose(); }}
+      className="fixed inset-0 m-auto max-h-[94vh] w-[calc(100%-2rem)] max-w-6xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-0 text-white shadow-2xl backdrop:bg-black/75"
+      aria-label="Customize flipbook">
+      <div className="p-5 sm:p-7">
         <div className="mb-5 flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-white">Customize &amp; brand</h2>
+            <h2 className="text-lg font-semibold text-white">Customize flipbook</h2>
             <p className="mt-0.5 text-sm text-slate-400">
-              Make this flipbook your client&apos;s — background, logo, colors, SEO.
+              Design your reader, add your branding, and choose how people experience your book.
             </p>
           </div>
           <button
@@ -127,6 +138,17 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
           </button>
         </div>
 
+        <div className="grid gap-6 lg:grid-cols-[170px_minmax(0,1fr)_minmax(0,1.1fr)]">
+        <nav aria-label="Customization settings" className="flex flex-wrap gap-2 lg:block lg:space-y-2">
+          {[["appearance", "Appearance"], ["branding", "Branding"], ["reader", "Reader controls"], ["search", "Search & sharing"]].map(([id, label]) => <button key={id} onClick={() => setTab(id)} aria-current={tab === id ? "page" : undefined} className={`rounded-xl px-4 py-3 text-left text-sm lg:w-full ${tab === id ? "bg-amber-400/10 text-amber-300" : "text-slate-400 hover:bg-slate-800"}`}>{label}</button>)}
+        </nav>
+        <div className="min-w-0 rounded-xl border border-slate-800 p-5">
+        <div hidden={tab !== "appearance"}>
+        <h3 className="mb-4 text-lg font-semibold">Appearance</h3>
+        <div className="mb-5 flex flex-wrap gap-2" aria-label="Color presets">
+        {[["Midnight", "#101521", "#fbbf24"], ["Studio", "#e8edf2", "#2563eb"], ["Forest", "#10251f", "#6ee7b7"], ["Warm paper", "#eee5d6", "#92400e"]].map(([name, bg, color]) => <button key={name} onClick={() => { setBgColor(bg); setAccent(color); }} className="rounded-lg border border-slate-700 px-3 py-2 text-xs hover:border-amber-400"><span className="mr-2 inline-block h-3 w-3 rounded-full border border-slate-500" style={{backgroundColor:bg}} />{name}</button>)}
+        </div>
+        <Section label="Accent color"><ColorField label="Accent" value={accent} onChange={setAccent} /></Section>
         {/* Background */}
         <Section label="Background">
           <div className="flex flex-wrap items-center gap-3">
@@ -171,6 +193,8 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
           />
         </Section>
 
+        </div>
+        <div hidden={tab !== "branding"}><h3 className="mb-4 text-lg font-semibold">Your brand</h3>
         {/* Logo */}
         <Section label="Logo (bottom-left)">
           <div className="flex flex-wrap items-center gap-3">
@@ -218,11 +242,8 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
           />
         </Section>
 
-        {/* Accent + SEO */}
-        <Section label="Accent color">
-          <ColorField label="Accent" value={accent} onChange={setAccent} />
-        </Section>
-
+        </div>
+        <div hidden={tab !== "search"}><h3 className="mb-4 text-lg font-semibold">Search &amp; sharing</h3>
         <Section label="SEO">
           <label className="block text-xs font-medium text-slate-400">Title (search + browser tab)</label>
           <input
@@ -241,6 +262,11 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
           />
         </Section>
 
+        </div>
+        <div hidden={tab !== "reader"}><h3 className="mb-4 text-lg font-semibold">Reader controls</h3>
+        <p className="mb-5 text-sm leading-6 text-slate-400">Choose the starting experience. Readers can still mute sound or open thumbnails themselves.</p>
+        <label className="mb-5 flex items-center gap-3 text-sm"><input type="checkbox" checked={pageSound} onChange={e => setPageSound(e.target.checked)} className="accent-amber-400" />Start with paper sound enabled</label>
+        <label className="mb-5 flex items-center gap-3 text-sm"><input type="checkbox" checked={showThumbnails} onChange={e => setShowThumbnails(e.target.checked)} className="accent-amber-400" />Open with page thumbnails visible</label>
         <label className="mt-4 flex items-center gap-2 text-sm text-slate-300">
           <input
             type="checkbox"
@@ -251,6 +277,9 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
           Allow viewers to download the PDF
         </label>
 
+        </div></div>
+        <aside className="min-w-0"><div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold">Book preview</h3><a href={`/book/${bookId}`} target="_blank" rel="noopener noreferrer" className="text-xs text-amber-400">Open full size ↗</a></div><iframe key={previewVersion} src={`/embed/${bookId}?preview=1`} title="Saved flipbook preview" className="h-[420px] w-full rounded-xl border border-slate-700" allowFullScreen /><p className="mt-3 text-xs leading-5 text-slate-400">Preview reflects saved settings. Save changes to update it. Your browser’s mute preference takes priority over the sound default.</p></aside>
+        </div>
         <div className="mt-5 flex items-center justify-between border-t border-slate-800 pt-4">
           <span className="text-xs">
             {status === "saved" && <span className="text-emerald-400">Saved ✓</span>}
@@ -259,14 +288,14 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
           </span>
           <button
             onClick={save}
-            disabled={saving}
+            disabled={saving || Boolean(busyAsset)}
             className="rounded-lg bg-amber-400 px-4 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:opacity-50"
           >
-            {saving ? "Saving…" : "Save branding"}
+            {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 

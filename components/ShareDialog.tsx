@@ -6,6 +6,7 @@ import type { Visibility } from "@/lib/types";
 
 interface ShareDialogProps {
   open: boolean;
+  initialTab?: "link" | "embed" | "privacy";
   onClose: () => void;
   title: string;
   shareUrl: string;
@@ -19,6 +20,7 @@ interface ShareDialogProps {
 
 export default function ShareDialog({
   open,
+  initialTab = "link",
   onClose,
   title,
   shareUrl,
@@ -29,6 +31,7 @@ export default function ShareDialog({
   hasPassword = false,
   onPrivacyChange,
 }: ShareDialogProps) {
+  const [tab, setTab] = useState(initialTab);
   if (!open) return null;
 
   const embedCode = embedUrl
@@ -64,14 +67,16 @@ export default function ShareDialog({
           </button>
         </div>
 
-        <CopyField label="Direct link" value={shareUrl} />
-        {embedCode && (
+        <nav aria-label="Sharing options" className="mb-6 flex gap-2 border-b border-slate-700 pb-3">
+          {([['link','Flipbook link'], ...(embedCode ? [['embed','Embed']] : []), ...(isOwner ? [['privacy','Privacy']] : [])]).map(([id,label]) => <button key={id} aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id as typeof tab)} className={`rounded-lg px-3 py-2 text-sm ${tab === id ? 'bg-amber-400/10 text-amber-300' : 'text-slate-400 hover:text-white'}`}>{label}</button>)}
+        </nav>
+        {tab === "link" && <><CopyField label="Flipbook link" value={shareUrl} /><SharePanel shareUrl={shareUrl} title={title} /></>}
+        {tab === "embed" && embedCode && (
           <CopyField label="Embed on your website" value={embedCode} multiline />
         )}
 
-        <SharePanel shareUrl={shareUrl} title={title} />
 
-        {isOwner && bookId && (
+        {tab === "privacy" && isOwner && bookId && (
           <PrivacyPanel
             bookId={bookId}
             visibility={visibility}
