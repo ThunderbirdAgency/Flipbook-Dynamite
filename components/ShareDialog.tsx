@@ -152,7 +152,7 @@ export function SharePanel({ shareUrl, title }: { shareUrl: string; title: strin
   );
 }
 
-function PrivacyPanel({
+export function PrivacyPanel({
   bookId,
   visibility,
   hasPassword,

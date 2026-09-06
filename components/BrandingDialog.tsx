@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { PrivacyPanel } from "./ShareDialog";
+import type { Book } from "@/lib/types";
 import type { Branding } from "@/lib/types";
 
 interface Props {
@@ -14,7 +16,7 @@ interface Props {
 export default function BrandingDialog({ open, onClose, bookId, branding, onChange }: Props) {
   const [extra,setExtra]=useState<Branding>(branding);
   const extraField=(key:"ctaLabel"|"ctaUrl"|"faviconUrl",label:string)=><label className="mb-4 block text-sm text-slate-300">{label}<input value={extra[key]||""} onChange={e=>setExtra({...extra,[key]:e.target.value})} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-white"/></label>;
-  const [tab, setTab] = useState("appearance");
+  const [tab, setTab] = useState("");
   const [previewVersion, setPreviewVersion] = useState(0);
   const [pageSound, setPageSound] = useState(branding.pageSound !== false);
   const [showThumbnails, setShowThumbnails] = useState(branding.showThumbnails === true);
@@ -119,35 +121,38 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
 
   return (
     <dialog ref={dialogRef} onCancel={(e) => { e.preventDefault(); onClose(); }}
-      className="fixed inset-0 m-auto max-h-[94vh] w-[calc(100%-2rem)] max-w-6xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-0 text-white shadow-2xl backdrop:bg-black/75"
+      className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none border-0 bg-slate-950 p-0 text-white backdrop:bg-black/75"
       aria-label="Customize flipbook">
-      <div className="p-5 sm:p-7">
-        <div className="mb-5 flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-white">Customize flipbook</h2>
-            <p className="mt-0.5 text-sm text-slate-400">
-              Design your reader, add your branding, and choose how people experience your book.
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-white"
-            aria-label="Close"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
+      <div className="grid h-full grid-rows-[auto_minmax(0,1fr)] md:grid-cols-[360px_minmax(0,1fr)] md:grid-rows-1">
+        <section aria-label="Flipbook options" className="flex min-h-0 flex-col border-b border-slate-700 bg-slate-900 md:border-b-0 md:border-r">
+          <header className="shrink-0 border-b border-slate-700 p-5">
+            <div className="flex items-center justify-between"><h2 className="text-xl font-semibold">Customize flipbook</h2><button onClick={onClose} aria-label="Close customization" className="rounded-lg px-3 py-2 text-slate-400 hover:bg-slate-800">✕</button></div>
+            <div className="mt-4 flex gap-3"><button onClick={save} disabled={saving || Boolean(busyAsset)} className="flex-1 rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-slate-950 disabled:opacity-50">{saving ? "Saving…" : "Save changes"}</button><button onClick={onClose} className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300">Close</button></div>
+            <div aria-live="polite" className="mt-2 text-xs">{status === "saved" && <span className="text-emerald-400">Saved ✓</span>}{error && <span role="alert" className="text-red-300">{error}</span>}</div>
+          </header>
+          <div className="max-h-[42dvh] overflow-y-auto md:max-h-none md:flex-1" aria-label="Customization settings">
+            <OptionGroup label="Branding & Style" id="branding" active={tab} onSelect={setTab}>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        <nav aria-label="Customization settings" className="flex flex-wrap gap-2 border-b border-slate-700 pb-4 lg:col-span-2">
-          {[["appearance", "Appearance"], ["branding", "Branding"], ["reader", "Reader controls"], ["search", "Title & description"], ["toc", "Table of contents"], ["layout", "Layout & interaction"]].map(([id, label]) => <button key={id} onClick={() => setTab(id)} aria-current={tab === id ? "page" : undefined} className={`rounded-xl px-4 py-3 text-left text-sm ${tab === id ? "bg-amber-400/10 text-amber-300" : "text-slate-400 hover:bg-slate-800"}`}>{label}</button>)}
-        </nav>
-        <div className="min-w-0 rounded-xl border border-slate-800 p-5">
-        <div hidden={tab !== "appearance"}>
-        <h3 className="mb-4 text-lg font-semibold">Appearance</h3>
+        <Section label="SEO">
+          <label className="block text-xs font-medium text-slate-400">Title (search + browser tab)</label>
+          <input
+            value={seoTitle}
+            onChange={(e) => setSeoTitle(e.target.value)}
+            placeholder="e.g. 2026 Spring Catalog — Acme Co."
+            className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60"
+          />
+          <label className="mt-3 block text-xs font-medium text-slate-400">Description</label>
+          <textarea
+            value={seoDescription}
+            onChange={(e) => setSeoDescription(e.target.value)}
+            rows={2}
+            placeholder="A short summary search engines and social previews will show."
+            className="mt-1.5 w-full resize-none rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60"
+          />
+        </Section>
+
+        
+        
         <div className="mb-5 flex flex-wrap gap-2" aria-label="Color presets">
         {[["Midnight", "#101521", "#fbbf24"], ["Studio", "#e8edf2", "#2563eb"], ["Forest", "#10251f", "#6ee7b7"], ["Warm paper", "#eee5d6", "#92400e"]].map(([name, bg, color]) => <button key={name} onClick={() => { setBgColor(bg); setAccent(color); }} className="rounded-lg border border-slate-700 px-3 py-2 text-xs hover:border-amber-400"><span className="mr-2 inline-block h-3 w-3 rounded-full border border-slate-500" style={{backgroundColor:bg}} />{name}</button>)}
         </div>
@@ -196,8 +201,7 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
           />
         </Section>
 
-        </div>
-        <div hidden={tab !== "branding"}><h3 className="mb-4 text-lg font-semibold">Your brand</h3>
+        
         {extraField("ctaLabel","Call-to-action button label")}
         {extraField("ctaUrl","Call-to-action destination (https://…)")}
         {extraField("faviconUrl","Favicon image URL (https://…)")}
@@ -248,28 +252,10 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
           />
         </Section>
 
-        </div>
-        <div hidden={tab !== "search"}><h3 className="mb-4 text-lg font-semibold">Search &amp; sharing</h3>
-        <Section label="SEO">
-          <label className="block text-xs font-medium text-slate-400">Title (search + browser tab)</label>
-          <input
-            value={seoTitle}
-            onChange={(e) => setSeoTitle(e.target.value)}
-            placeholder="e.g. 2026 Spring Catalog — Acme Co."
-            className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60"
-          />
-          <label className="mt-3 block text-xs font-medium text-slate-400">Description</label>
-          <textarea
-            value={seoDescription}
-            onChange={(e) => setSeoDescription(e.target.value)}
-            rows={2}
-            placeholder="A short summary search engines and social previews will show."
-            className="mt-1.5 w-full resize-none rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60"
-          />
-        </Section>
+        
+            </OptionGroup>
+            <OptionGroup label="Controls" id="reader" active={tab} onSelect={setTab}>
 
-        </div>
-        <div hidden={tab !== "reader"}><h3 className="mb-4 text-lg font-semibold">Reader controls</h3>
         <p className="mb-5 text-sm leading-6 text-slate-400">Choose the starting experience. Readers can still mute sound or open thumbnails themselves.</p>
         <label className="mb-5 flex items-center gap-3 text-sm"><input type="checkbox" checked={pageSound} onChange={e => setPageSound(e.target.checked)} className="accent-amber-400" />Start with paper sound enabled</label>
         <label className="mb-5 flex items-center gap-3 text-sm"><input type="checkbox" checked={showThumbnails} onChange={e => setShowThumbnails(e.target.checked)} className="accent-amber-400" />Open with page thumbnails visible</label>
@@ -284,26 +270,26 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
         </label>
 
         {([["allowShare","Share"],["allowSearch","Search"],["allowZoom","Zoom"],["allowFullscreen","Fullscreen"],["allowThumbnails","Thumbnails control"],["allowToc","Table of contents control"],["allowAutoplay","Auto page turn control"]] as const).map(([key,label])=><label key={key} className="mt-4 flex items-center gap-3 text-sm text-slate-300"><input type="checkbox" checked={extra[key]!==false} onChange={e=>setExtra({...extra,[key]:e.target.checked})}/>{label}</label>)}
-        </div>
-        <div hidden={tab!=="layout"}><h3 className="mb-4 text-lg font-semibold">Layout & interaction</h3><label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={extra.showCover!==false} onChange={e=>setExtra({...extra,showCover:e.target.checked})}/>Separate front cover</label><label className="mt-5 block text-sm">Shadow depth<input type="range" min="0" max="1" step="0.1" value={extra.shadow??0.4} onChange={e=>setExtra({...extra,shadow:Number(e.target.value)})} className="mt-3 w-full"/></label><p className="mt-5 text-sm text-slate-400">Responsive page layout adapts to the reader’s screen.</p></div>
-        <div hidden={tab!=="toc"}><h3 className="mb-4 text-lg font-semibold">Table of contents</h3><p className="mb-4 text-xs text-slate-400">Use custom headings below, or leave empty to use the PDF’s own contents. Page numbers start at 1.</p>{(extra.toc||[]).map((entry,i)=><div key={i} className="mb-3 flex gap-2"><input aria-label={`Heading ${i+1}`} value={entry.title} onChange={e=>setExtra({...extra,toc:extra.toc!.map((v,n)=>n===i?{...v,title:e.target.value}:v)})} className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 p-2 text-sm"/><input aria-label={`Page for heading ${i+1}`} type="number" min="1" value={entry.pageIndex+1} onChange={e=>setExtra({...extra,toc:extra.toc!.map((v,n)=>n===i?{...v,pageIndex:Math.max(0,Number(e.target.value)-1)}:v)})} className="w-16 rounded border border-slate-700 bg-slate-950 p-2 text-sm"/><button aria-label={`Remove heading ${i+1}`} onClick={()=>setExtra({...extra,toc:extra.toc!.filter((_,n)=>i!==n)})}>✕</button></div>)}<button className="text-sm text-amber-400" onClick={()=>setExtra({...extra,toc:[...(extra.toc||[]),{title:"New heading",pageIndex:0,depth:0}]})}>＋ Add heading</button></div>
-        </div>
-        <aside className="min-w-0"><div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold">Book preview</h3><a href={`/book/${bookId}`} target="_blank" rel="noopener noreferrer" className="text-xs text-amber-400">Open full size ↗</a></div><iframe key={previewVersion} src={`/embed/${bookId}?preview=1`} title="Saved flipbook preview" className="h-[420px] w-full rounded-xl border border-slate-700" allowFullScreen /><p className="mt-3 text-xs leading-5 text-slate-400">Preview reflects saved settings. Save changes to update it. Your browser’s mute preference takes priority over the sound default.</p></aside>
-        </div>
-        <div className="mt-5 flex items-center justify-between border-t border-slate-800 pt-4">
-          <span className="text-xs">
-            {status === "saved" && <span className="text-emerald-400">Saved ✓</span>}
-            {status === "error" && <span className="text-red-400">{error}</span>}
-            {status === "idle" && error && <span className="text-red-400">{error}</span>}
-          </span>
-          <button
-            onClick={save}
-            disabled={saving || Boolean(busyAsset)}
-            className="rounded-lg bg-amber-400 px-4 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Save changes"}
-          </button>
-        </div>
+        
+            </OptionGroup>
+            <OptionGroup label="Privacy" id="privacy" active={tab} onSelect={setTab}>
+<BookPrivacy bookId={bookId} />
+            </OptionGroup>
+            <OptionGroup label="Table of Contents" id="toc" active={tab} onSelect={setTab}>
+<p className="mb-4 text-xs text-slate-400">Use custom headings below, or leave empty to use the PDF’s own contents. Page numbers start at 1.</p>{(extra.toc||[]).map((entry,i)=><div key={i} className="mb-3 flex gap-2"><input aria-label={`Heading ${i+1}`} value={entry.title} onChange={e=>setExtra({...extra,toc:extra.toc!.map((v,n)=>n===i?{...v,title:e.target.value}:v)})} className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 p-2 text-sm"/><input aria-label={`Page for heading ${i+1}`} type="number" min="1" value={entry.pageIndex+1} onChange={e=>setExtra({...extra,toc:extra.toc!.map((v,n)=>n===i?{...v,pageIndex:Math.max(0,Number(e.target.value)-1)}:v)})} className="w-16 rounded border border-slate-700 bg-slate-950 p-2 text-sm"/><button aria-label={`Remove heading ${i+1}`} onClick={()=>setExtra({...extra,toc:extra.toc!.filter((_,n)=>i!==n)})}>✕</button></div>)}<button className="text-sm text-amber-400" onClick={()=>setExtra({...extra,toc:[...(extra.toc||[]),{title:"New heading",pageIndex:0,depth:0}]})}>＋ Add heading</button>
+            </OptionGroup>
+            <OptionGroup label="Layout & Interaction" id="layout" active={tab} onSelect={setTab}>
+<label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={extra.showCover!==false} onChange={e=>setExtra({...extra,showCover:e.target.checked})}/>Separate front cover</label><label className="mt-5 block text-sm">Shadow depth<input type="range" min="0" max="1" step="0.1" value={extra.shadow??0.4} onChange={e=>setExtra({...extra,shadow:Number(e.target.value)})} className="mt-3 w-full"/></label><p className="mt-5 text-sm text-slate-400">Responsive page layout adapts to the reader’s screen.</p>
+            </OptionGroup>
+
+            <a href={`/book/${bookId}?edit=1`} className="block border-b border-slate-700 px-5 py-5 text-sm font-medium text-amber-300">Add video, links, etc. ↗</a>
+          </div>
+        </section>
+        <aside className="flex min-h-0 min-w-0 flex-col bg-slate-950 p-3 sm:p-5">
+          <div className="mb-3 flex shrink-0 items-center justify-between"><h3 className="text-sm text-slate-400">Book preview</h3><a href={`/book/${bookId}`} target="_blank" rel="noopener noreferrer" className="text-xs text-amber-400">Open full size ↗</a></div>
+          <iframe key={previewVersion} src={`/embed/${bookId}?preview=1`} title="Saved flipbook preview" className="min-h-0 w-full flex-1 rounded-xl border border-slate-800" allowFullScreen />
+          <p className="mt-3 shrink-0 text-xs text-slate-500">Preview shows saved settings. Save changes to update the book.</p>
+        </aside>
       </div>
     </dialog>
   );
@@ -345,4 +331,16 @@ function ColorField({
       />
     </label>
   );
+}
+
+function OptionGroup({label,id,active,onSelect,children}:{label:string;id:string;active:string;onSelect:(id:string)=>void;children:React.ReactNode}) {
+  const expanded=active===id;
+  return <section className="border-b border-slate-700"><h3><button aria-expanded={expanded} aria-controls={`options-${id}`} onClick={()=>onSelect(expanded?"":id)} className={`flex w-full items-center justify-between px-5 py-5 text-left text-sm font-semibold ${expanded?"bg-slate-800 text-amber-300":"text-slate-200 hover:bg-slate-800/60"}`}>{label}<span aria-hidden="true">{expanded?"−":"+"}</span></button></h3><div id={`options-${id}`} hidden={!expanded} className="px-5 py-5">{expanded && children}</div></section>;
+}
+function BookPrivacy({bookId}:{bookId:string}) {
+ const [book,setBook]=useState<Book|null>(null),[error,setError]=useState("");
+ useEffect(()=>{let alive=true;fetch(`/api/books/${bookId}`).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error||"Could not load privacy settings.");if(alive)setBook(d.book);}).catch(e=>{if(alive)setError(e.message);});return()=>{alive=false;};},[bookId]);
+ if(error)return <p role="alert" className="text-sm text-red-300">{error}</p>;
+ if(!book)return <p className="text-sm text-slate-400">Loading privacy settings…</p>;
+ return <PrivacyPanel bookId={bookId} visibility={book.visibility} hasPassword={book.hasPassword} onChange={(visibility,hasPassword)=>setBook({...book,visibility,hasPassword})}/>;
 }
