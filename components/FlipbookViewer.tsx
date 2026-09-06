@@ -624,6 +624,9 @@ export default function FlipbookViewer({
 
       {isOwner && bookId && editOpen && pages && (
         <OverlayEditor
+          title={title}
+          branding={brand}
+          onMetadataChange={setBrand}
           bookId={bookId}
           pages={pages}
           overlays={overlayList}

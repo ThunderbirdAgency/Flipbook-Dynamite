@@ -38,7 +38,7 @@ export function sanitizeOverlays(input: unknown): Overlay[] {
     if (!type) continue;
 
     const page = Math.max(1, Math.min(100000, Math.floor(Number(o.page) || 1)));
-    const url = cleanUrl(o.url);
+    const url = type === "link" && typeof o.url === "string" && /^#(?:page-)?[1-9]\d{0,4}$/.test(o.url.trim()) ? o.url.trim() : cleanUrl(o.url);
     // Every type needs a valid URL.
     if (!url) continue;
     // iframe embeds must be absolute cross-origin URLs — never a same-origin

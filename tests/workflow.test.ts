@@ -61,6 +61,13 @@ test("complete PDF lifecycle, ownership, private content, and failure recovery",
     assert.equal((await imageUpload(new NextRequest("https://flip.example", { method: "POST", body: png }), assetContext)).status, 200);
     assert.equal((await imageRead(request(), assetContext)).status, 200);
 
+    assert.equal((await update(request("PATCH", {title:"Searchable guide",branding:{seoTitle:"Home buyer guide",seoDescription:"Steps to buying a home."},overlays:[{id:"pagejump",type:"link",url:"#2",page:1}]}),context)).status,200);
+    const edited=(await (await metadata(request(),context)).json()).book;
+    assert.equal(edited.title,"Searchable guide");
+    assert.equal(edited.branding.seoTitle,"Home buyer guide");
+    assert.equal(edited.branding.seoDescription,"Steps to buying a home.");
+    assert.equal(edited.overlays[0].url,"#2");
+    assert.equal((await update(request("PATCH",{title:"   "}),context)).status,400);
     // A different creator cannot rename/delete/read private content or assets.
     const protectedBook = { ...(await getBook(book.id))!, id: "privatebook1", ownerId: "another-user", visibility: "private" as const, passwordHash: hashPassword("first-password"), hasPassword: true };
     await createBook(protectedBook);

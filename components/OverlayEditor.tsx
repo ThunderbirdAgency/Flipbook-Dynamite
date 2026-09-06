@@ -1,11 +1,15 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { Overlay, OverlayType } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import type { Branding, Overlay, OverlayType } from "@/lib/types";
 import type { RenderedPage } from "@/lib/pdf-client";
 
 interface Props {
   bookId: string;
+  title: string;
+  branding: Branding;
+  onMetadataChange: (branding: Branding) => void;
   pages: RenderedPage[];
   overlays: Overlay[];
   onChange: (overlays: Overlay[]) => void;
@@ -21,7 +25,12 @@ const DEFAULTS: Record<OverlayType, Partial<Overlay>> = {
   iframe: { w: 42, h: 30, display: "inline" },
 };
 
-export default function OverlayEditor({ bookId, pages, overlays, onChange, onClose }: Props) {
+export default function OverlayEditor({ bookId, title, branding, onMetadataChange, pages, overlays, onChange, onClose }: Props) {
+  const router=useRouter();
+  const [details,setDetails]=useState(false);
+  const [publicationTitle,setPublicationTitle]=useState(title);
+  const [seoTitle,setSeoTitle]=useState(branding.seoTitle||"");
+  const [seoDescription,setSeoDescription]=useState(branding.seoDescription||"");
   const [list, setList] = useState<Overlay[]>(overlays);
   const [pageIdx, setPageIdx] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
@@ -42,7 +51,8 @@ export default function OverlayEditor({ bookId, pages, overlays, onChange, onClo
     setList((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)));
   }, []);
 
-  const add = (type: OverlayType) => {
+  const add = (type: OverlayType, display?: "inline"|"popup") => {
+    setDetails(false);
     const o: Overlay = {
       id: newId(),
       page: pageNum,
@@ -53,6 +63,7 @@ export default function OverlayEditor({ bookId, pages, overlays, onChange, onClo
       type,
       url: "",
       ...DEFAULTS[type],
+      ...(display ? {display} : {}),
     };
     setList((prev) => [...prev, o]);
     setSelected(o.id);
@@ -133,7 +144,7 @@ export default function OverlayEditor({ bookId, pages, overlays, onChange, onClo
       const res = await fetch(`/api/books/${bookId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ overlays: list }),
+        body: JSON.stringify({ overlays: list, title:publicationTitle, branding:{seoTitle:seoTitle.trim()||null,seoDescription:seoDescription.trim()||null} }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -141,6 +152,8 @@ export default function OverlayEditor({ bookId, pages, overlays, onChange, onClo
       }
       const data = await res.json();
       const saved = (data.book?.overlays as Overlay[]) ?? list;
+      if(data.book?.branding) onMetadataChange(data.book.branding);
+      router.refresh();
       setList(saved);
       onChange(saved);
       setStatus("saved");
@@ -156,11 +169,11 @@ export default function OverlayEditor({ bookId, pages, overlays, onChange, onClo
   const aspect = page ? `${page.baseWidth} / ${page.baseHeight}` : "3 / 4";
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col bg-slate-950/95 backdrop-blur">
+    <div role="dialog" aria-modal="true" aria-label="Edit flipbook" className="fixed inset-0 z-[70] flex flex-col bg-slate-950 text-white">
       {/* Top bar */}
       <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold text-white">Interactive layers</span>
+          <span className="text-sm font-semibold text-white">Add interactive elements</span>
           <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-300">
             {list.length} on {new Set(list.map((o) => o.page)).size} page
             {new Set(list.map((o) => o.page)).size === 1 ? "" : "s"}
@@ -173,27 +186,35 @@ export default function OverlayEditor({ bookId, pages, overlays, onChange, onClo
           </span>
           <button
             onClick={save}
-            disabled={saving}
+            disabled={saving || uploading || !publicationTitle.trim()}
             className="rounded-lg bg-amber-400 px-4 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:opacity-50"
           >
-            {saving ? "Saving…" : "Save"}
+            {saving ? "Saving…" : "Save changes"}
           </button>
           <button
             onClick={onClose}
             className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-200 transition hover:bg-slate-800"
           >
-            Done
+            Close
           </button>
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 overflow-x-auto">
+        <aside aria-label="Add elements" className="w-44 shrink-0 overflow-y-auto border-r border-slate-700 bg-slate-900 p-3">
+          <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-400">Add to page {pageNum}</h2>
+          <div className="space-y-2"><AddBtn label="Video" hint="YouTube · Vimeo · MP4" onClick={()=>add("video")}/><AddBtn label="Link" hint="Website or page" onClick={()=>add("link")}/><AddBtn label="Inline image" hint="Place on the page" onClick={()=>add("image","inline")}/><AddBtn label="Pop-up image" hint="Open on click" onClick={()=>add("image","popup")}/><AddBtn label="Animated GIF" hint="Add motion" onClick={()=>add("image","inline")}/><AddBtn label="Forms & embeds" hint="Embed a hosted form" onClick={()=>add("iframe")}/></div>
+          <button onClick={()=>setDetails(true)} className="mt-5 w-full rounded-lg border border-amber-400/40 px-3 py-3 text-left text-sm text-amber-300">Title & SEO</button>
+        </aside>
+        <nav aria-label="Page thumbnails" className="w-24 shrink-0 space-y-3 overflow-y-auto border-r border-slate-800 bg-slate-900/40 p-3">{pages.map((p,i)=><button key={i} aria-label={`Edit page ${i+1}`} aria-current={pageIdx===i?"page":undefined} onClick={()=>{setPageIdx(i);setSelected(null);}} className={`block w-full rounded-lg border-2 p-1 ${pageIdx===i?"border-amber-400":"border-transparent hover:border-slate-600"}`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={p.objectUrl} alt="" className="w-full bg-white"/><span className="mt-1 block text-xs text-slate-400">{i+1}</span></button>)}</nav>
         {/* Canvas */}
-        <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 overflow-auto p-6">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-3 overflow-auto p-4">
           <div
             ref={canvasRef}
             className="relative max-h-full w-auto select-none bg-white shadow-2xl"
-            style={{ aspectRatio: aspect, height: "min(78vh, 900px)" }}
+            style={{ aspectRatio: aspect, height: "min(74vh, 900px)", maxWidth:"100%" }}
             onPointerDown={() => setSelected(null)}
           >
             {page && (
@@ -205,7 +226,7 @@ export default function OverlayEditor({ bookId, pages, overlays, onChange, onClo
                 key={o.id}
                 o={o}
                 selected={o.id === selected}
-                onSelect={() => setSelected(o.id)}
+                onSelect={() => {setDetails(false);setSelected(o.id);}}
                 onStartMove={(e) => startDrag(e, o.id, "move")}
                 onStartResize={(e) => startDrag(e, o.id, "resize")}
               />
@@ -234,19 +255,7 @@ export default function OverlayEditor({ bookId, pages, overlays, onChange, onClo
           </div>
         </div>
 
-        {/* Sidebar */}
-        <div className="w-80 shrink-0 overflow-y-auto border-l border-slate-800 bg-slate-900/60 p-4">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
-            Add to page {pageNum}
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <AddBtn label="Video" hint="YouTube · Vimeo · MP4" onClick={() => add("video")} />
-            <AddBtn label="Image / GIF" hint="Movable layer" onClick={() => add("image")} />
-            <AddBtn label="Link" hint="URL or page jump" onClick={() => add("link")} />
-            <AddBtn label="Embed" hint="Any iframe URL" onClick={() => add("iframe")} />
-          </div>
-
-          <div className="mt-5 border-t border-slate-800 pt-4">
+        <aside aria-label="Element and publication settings" className="w-80 shrink-0 overflow-y-auto border-l border-slate-700 bg-slate-900 p-4"><div className="flex gap-2 border-b border-slate-700 pb-3"><button onClick={()=>setDetails(false)} className={`rounded px-3 py-2 text-sm ${!details?"bg-slate-700 text-white":"text-slate-400"}`}>Element settings</button><button onClick={()=>setDetails(true)} className={`rounded px-3 py-2 text-sm ${details?"bg-slate-700 text-white":"text-slate-400"}`}>Title & SEO</button></div>{details ? <div className="mt-5 space-y-5"><h2 className="text-lg font-semibold">Title & SEO</h2><label className="block text-sm text-slate-300">Publication title<input required maxLength={200} value={publicationTitle} onChange={e=>setPublicationTitle(e.target.value)} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-white"/></label><label className="block text-sm text-slate-300">SEO title<input maxLength={200} value={seoTitle} onChange={e=>setSeoTitle(e.target.value)} placeholder={publicationTitle} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-white"/></label><p className="text-xs text-slate-500">Used in the browser tab and search/social previews. Leave blank to use the publication title.</p><label className="block text-sm text-slate-300">SEO description<textarea maxLength={320} rows={5} value={seoDescription} onChange={e=>setSeoDescription(e.target.value)} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-white"/></label><p className="text-xs text-slate-500">{seoDescription.length}/320 characters. Private and password-protected books keep their titles and descriptions hidden from search previews.</p><div className="rounded-lg border border-slate-700 p-4"><p className="text-xs uppercase tracking-wide text-slate-500">Search preview</p><p className="mt-3 break-words text-lg text-blue-300">{seoTitle||publicationTitle}</p><p className="mt-2 break-words text-sm text-slate-400">{seoDescription||'Add a short description of this publication.'}</p></div></div> : <>          <div className="mt-5">
             {!sel ? (
               <p className="text-sm text-slate-500">
                 Select a layer on the page to edit it, or add one above. Drag to move; drag the
@@ -338,14 +347,14 @@ export default function OverlayEditor({ bookId, pages, overlays, onChange, onClo
                   {(["x", "y", "w", "h"] as const).map((k) => (
                     <div key={k}>
                       <div className="uppercase">{k}</div>
-                      <div className="tabular-nums text-slate-300">{Math.round(sel[k])}%</div>
+                      <input aria-label={`${k.toUpperCase()} percent`} type="number" min={k==='w'||k==='h'?1:0} max="100" step="0.1" value={Math.round(sel[k]*10)/10} onChange={e=>update(sel.id,{[k]:Math.max(k==='w'||k==='h'?1:0,Math.min(100,Number(e.target.value)))})} className="mt-1 w-full rounded border border-slate-700 bg-slate-950 p-2 text-slate-200"/>
                     </div>
                   ))}
                 </div>
               </div>
             )}
           </div>
-        </div>
+</>}</aside>
       </div>
     </div>
   );
@@ -402,7 +411,7 @@ function AddBtn({ label, hint, onClick }: { label: string; hint: string; onClick
   return (
     <button
       onClick={onClick}
-      className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-left transition hover:border-amber-400/60 hover:bg-slate-900"
+      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-left transition hover:border-amber-400/60 hover:bg-slate-900"
     >
       <span className="block text-sm font-medium text-white">{label}</span>
       <span className="mt-0.5 block text-[11px] text-slate-500">{hint}</span>

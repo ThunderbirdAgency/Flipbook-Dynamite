@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { deleteBook, getBook, updateBook, enforceRateLimit, type BookPatch } from "@/lib/store";
 import { currentUserId } from "@/lib/auth";
 import { hashPassword } from "@/lib/access";
+import { parseTitle } from "@/lib/validation";
 import { mergeBranding } from "@/lib/branding";
 import { sanitizeOverlays } from "@/lib/overlays";
 import { gateBookRequest } from "@/lib/gate";
@@ -56,8 +57,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     const patch: BookPatch = {};
-    if (typeof body.title === "string" && body.title.trim()) {
-      patch.title = body.title;
+    if ("title" in body) {
+      patch.title = parseTitle(body.title);
     }
     if (body.visibility === "public" || body.visibility === "private") {
       patch.visibility = body.visibility;
