@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PageFlip } from "page-flip";
 import { renderPdfToPages, OutlineItem, RenderedPage } from "@/lib/pdf-client";
-import { FLIP_DURATION_MS, playFlipSound, playDragSound, prepareFlipSound } from "@/lib/flip-sound";
+import { FLIP_DURATION_MS, playFlipSound, stopFlipSound, prepareFlipSound } from "@/lib/flip-sound";
 import ShareDialog from "@/components/ShareDialog";
 import BrandingDialog from "@/components/BrandingDialog";
 import ZoomOverlay from "@/components/ZoomOverlay";
@@ -105,17 +105,9 @@ export default function FlipbookViewer({
   const flipRef = useRef<PageFlip | null>(null);
   // Mirror for event handlers registered once at PageFlip init.
   const mutedRef = useRef(muted);
-  const pullingRef = useRef(false);
-  const lastRustleRef = useRef(0);
-  const rustleWhilePulling = () => {
-    if (!pullingRef.current || mutedRef.current) return;
-    const now = performance.now();
-    if (now - lastRustleRef.current < 140) return;
-    lastRustleRef.current = now;
-    playDragSound();
-  };
   useEffect(() => {
     mutedRef.current = muted;
+    if (muted) stopFlipSound();
   }, [muted]);
 
   // Owner can flip privacy from the share dialog; keep a live copy for the UI.
@@ -219,13 +211,12 @@ export default function FlipbookViewer({
         setCurrent(index);
         reportEventRef.current("page", index + 1);
       });
+      let previousState: unknown = "read";
       flip.on("changeState", (e) => {
-        // Pulling is separate from click/keyboard turns; corner hover stays silent.
-        pullingRef.current = e.data === "user_fold";
-        if (!mutedRef.current) {
-          if (e.data === "flipping") playFlipSound();
-          if (e.data === "user_fold") { lastRustleRef.current = performance.now(); playDragSound(); }
+        if (e.data === "flipping" && previousState !== "flipping" && !mutedRef.current) {
+          playFlipSound();
         }
+        previousState = e.data;
       });
       const requestedPage=Number(new URLSearchParams(location.search).get('page'));
       if(Number.isInteger(requestedPage)&&requestedPage>0&&requestedPage<=pages.length) flip.turnToPage(requestedPage-1);
@@ -235,7 +226,7 @@ export default function FlipbookViewer({
 
     return () => {
       disposed = true;
-      pullingRef.current = false;
+      stopFlipSound();
       flipRef.current = null;
       try {
         flip?.destroy();
@@ -309,9 +300,6 @@ export default function FlipbookViewer({
   return (
     <div
       ref={containerRef}
-      onPointerMoveCapture={rustleWhilePulling}
-      onTouchMoveCapture={rustleWhilePulling}
-      onPointerCancel={() => { pullingRef.current = false; }}
       onPointerDownCapture={() => { if (!mutedRef.current) prepareFlipSound(); }}
       onKeyDownCapture={() => { if (!mutedRef.current) prepareFlipSound(); }}
       className="relative flex h-full w-full flex-col overflow-hidden bg-slate-950"

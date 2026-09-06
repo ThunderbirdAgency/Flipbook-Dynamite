@@ -1,10 +1,12 @@
 // Synthesized paper page-flip sound via Web Audio — no audio asset needed.
-// Two layered noise swishes (slide + settle) approximate a real page turn.
+// One short swish per turn; never layer repeated drag or touch events.
 
 export const FLIP_DURATION_MS = 650;
 
 let audioCtx: AudioContext | null = null;
 let noiseBuffer: AudioBuffer | null = null;
+let activeSource: AudioBufferSourceNode | null = null;
+let lastPlayedAt = -Infinity;
 
 function getContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -41,6 +43,7 @@ function swish(
 ) {
   const src = ctx.createBufferSource();
   src.buffer = getNoise(ctx);
+  activeSource = src;
 
   const filter = ctx.createBiquadFilter();
   filter.type = "bandpass";
@@ -58,7 +61,10 @@ function swish(
   gain.connect(ctx.destination);
   src.start(when, Math.random() * 0.2, duration + 0.05);
   src.stop(when + duration + 0.05);
-  src.onended = () => { src.disconnect(); filter.disconnect(); gain.disconnect(); };
+  src.onended = () => {
+    if (activeSource === src) activeSource = null;
+    src.disconnect(); filter.disconnect(); gain.disconnect();
+  };
 }
 
 export function prepareFlipSound() {
@@ -68,17 +74,19 @@ export function prepareFlipSound() {
 
 export function playFlipSound() {
   const ctx = getContext();
-  if (!ctx) return;
+  // Never queue sounds while browser audio is suspended.
+  if (!ctx || ctx.state !== "running") return;
   const now = ctx.currentTime;
-  // Main swish: the page sliding through the air.
-  const duration = FLIP_DURATION_MS / 1000;
-  swish(ctx, now, duration * 0.8, 650, 2400, 0.16);
-  // Softer, lower tail: the page settling down.
-  swish(ctx, now + duration * 0.65, duration * 0.35, 1800, 450, 0.06);
+  if (activeSource || now - lastPlayedAt < FLIP_DURATION_MS / 1000) return;
+  lastPlayedAt = now;
+  swish(ctx, now, 0.38, 650, 2200, 0.12);
 }
 
-/** A short rustle while the reader physically pulls a page. */
-export function playDragSound() {
-  const ctx = getContext();
-  if (ctx) swish(ctx, ctx.currentTime, 0.18, 600, 1500, 0.075);
+export function stopFlipSound() {
+  const source = activeSource;
+  activeSource = null;
+  if (source) {
+    try { source.stop(); } catch { /* Already ended. */ }
+    source.disconnect();
+  }
 }
