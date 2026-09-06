@@ -82,24 +82,6 @@ export default function FlipbookViewer({
       return preference === null ? branding.pageSound === false : preference === "1";
     }
   );
-  // Two-page spread on desktop, single page on phones — the spread is what
-  // reads as a real bound book. Re-init the engine when we cross the breakpoint.
-  const [portrait, setPortrait] = useState(
-    () => typeof window !== "undefined" && window.innerWidth < 900
-  );
-  useEffect(() => {
-    let t: ReturnType<typeof setTimeout>;
-    const onResize = () => {
-      clearTimeout(t);
-      t = setTimeout(() => setPortrait(window.innerWidth < 900), 200);
-    };
-    window.addEventListener("resize", onResize);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener("resize", onResize);
-    };
-  }, []);
-
   const containerRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<HTMLDivElement>(null);
   const flipRef = useRef<PageFlip | null>(null);
@@ -195,7 +177,8 @@ export default function FlipbookViewer({
         minHeight: 220,
         maxHeight: 3000,
         showCover: brand.showCover !== false,
-        usePortrait: portrait,
+        // Let PageFlip adapt to its available width without destroying the DOM.
+        usePortrait: true,
         autoSize: true,
         // Keep the turn and paper sound on the same timing.
         drawShadow: true,
@@ -234,7 +217,7 @@ export default function FlipbookViewer({
         // PageFlip.destroy throws if it never finished mounting; safe to ignore.
       }
     };
-  }, [pages, portrait, brand.showCover, brand.shadow]);
+  }, [pages, brand.showCover, brand.shadow]);
 
   // Keyboard navigation.
   useEffect(() => {

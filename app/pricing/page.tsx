@@ -112,7 +112,7 @@ export default function PricingPage() {
           Pricing that won&apos;t blow up your budget
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-slate-400">
-          Start free. Upgrade when you want video layers, your own brand, and analytics. No
+          Start free with video layers, your own brand, and analytics in the current preview. No
           per-view fees — ever.
         </p>
       </section>

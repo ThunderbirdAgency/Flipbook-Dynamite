@@ -57,7 +57,7 @@ export default function Landing() {
               </Link>
             </div>
             <p className="mt-4 text-sm text-slate-500">
-              Viewers never need an account. Works on every device and inside any website.
+              Public books open without an account. Private books require owner access.
             </p>
           </div>
 
@@ -86,9 +86,9 @@ export default function Landing() {
       <section id="features" className="mx-auto w-full max-w-6xl px-6 py-20">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Everything FlippingBook charges for.
+            Create, customize, and share.
             <br />
-            <span className="text-slate-400">Plus the parts they skimp on.</span>
+            <span className="text-slate-400">Your PDF, with more possibilities.</span>
           </h2>
         </div>
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -130,9 +130,9 @@ export default function Landing() {
       {/* Pricing preview */}
       <section className="mx-auto w-full max-w-6xl px-6 py-20">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Simple, honest pricing</h2>
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Planned pricing</h2>
           <p className="mt-3 text-slate-400">
-            Everything you need in the middle tier. No per-view fees, no surprises.
+            The preview is free, with up to 100 books and 1 GB per account. Paid plans and team seats are not available yet.
           </p>
         </div>
         <div className="mt-10 grid gap-5 sm:grid-cols-3">
@@ -166,7 +166,7 @@ export default function Landing() {
                     : "border border-white/15 text-white hover:bg-white/5"
                 }`}
               >
-                Choose {p.name}
+                Preview {p.name}
               </Link>
             </div>
           ))}
@@ -224,13 +224,13 @@ const FEATURES = [
     icon: <IconBrush />,
   },
   {
-    title: "Know who read it",
+    title: "See how it is read",
     body: "Per-book views, unique visitors, and a page-reach funnel that shows exactly where readers drop off.",
     icon: <IconChart />,
   },
   {
     title: "Search every page",
-    body: "Full-text search jumps readers to the exact page — and your titles are set up to be found on Google.",
+    body: "Full-text search jumps readers to the exact page — and public books support custom SEO titles and descriptions.",
     icon: <IconSearch />,
   },
   {
@@ -249,7 +249,7 @@ const STEPS = [
 const PLANS = [
   { name: "Starter", price: 29, tagline: "For the occasional flipbook", featured: false },
   { name: "Professional", price: 79, tagline: "Video, branding & analytics", featured: true },
-  { name: "Business", price: 179, tagline: "White-label & unlimited", featured: false },
+  { name: "Business", price: 179, tagline: "Planned team features", featured: false },
 ];
 
 function IconBook() {
