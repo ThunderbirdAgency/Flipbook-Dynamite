@@ -5,6 +5,7 @@ import { validatePdf } from "./validation";
 import { AppError } from "./errors";
 import { promises as fs } from "fs";
 import path from "path";
+import { nanoid } from "nanoid";
 import { Branding, BookEvent, BookStats, Overlay, StoredBook, Visibility } from "./types";
 
 // Production uses server-only credentials and private Supabase buckets.
@@ -338,6 +339,53 @@ export async function deleteBook(id: string): Promise<boolean> {
       .catch(() => {});
     return true;
   });
+}
+
+/** Duplicate owned content with independent storage and fresh analytics. */
+export async function copyBook(source: StoredBook): Promise<StoredBook> {
+  const copy: StoredBook = { ...source, id: nanoid(10), status: "pending",
+    title: `Copy of ${source.title}`.slice(0, 200), createdAt: new Date().toISOString(),
+    visibility: "private", branding: {}, overlays: [] };
+  await createBook(copy);
+  try {
+    if (supabaseMode) {
+      const result = await fetch(`${SUPABASE_URL}/storage/v1/object/copy`, {
+        method: "POST", headers: sbHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ bucketId: BUCKET, sourceKey: `${source.id}.pdf`, destinationKey: `${copy.id}.pdf` }),
+      });
+      if (!result.ok) throw new Error("Could not copy the PDF");
+    } else {
+      await fs.copyFile(fsPdfPath(source.id), fsPdfPath(copy.id), 1);
+    }
+    // Keep the copy owner-only while image reservations and metadata are prepared.
+    await updateBook(copy.id, { status: "ready" });
+    const urls = new Map<string, string>();
+    const cloneUrl = async (value: string | undefined) => {
+      if (!value) return value;
+      const match = value.match(new RegExp(`^/api/books/${source.id}/asset/([A-Za-z0-9_-]{1,60})(?:\\?.*)?$`));
+      if (!match) return value;
+      const kind = match[1];
+      if (!urls.has(kind)) {
+        const bytes = await readAssetBytes(source.id, kind);
+        if (!bytes) throw new Error("A source image is missing; restore it before copying");
+        const mime = bytes[0] === 0x89 ? "image/png" : bytes[0] === 0xff ? "image/jpeg" : bytes[0] === 0x47 ? "image/gif" : "image/webp";
+        urls.set(kind, await saveAsset(copy.id, kind, bytes, mime));
+      }
+      return urls.get(kind)!;
+    };
+    const branding = { ...source.branding };
+    for (const key of ["logoUrl", "bgImageUrl", "faviconUrl"] as const) {
+      if (branding[key]) branding[key] = await cloneUrl(branding[key]);
+    }
+    const overlays: Overlay[] = [];
+    for (const overlay of source.overlays) overlays.push({ ...overlay, url: await cloneUrl(overlay.url) });
+    const result = await updateBook(copy.id, { branding, overlays, visibility: source.visibility });
+    if (!result) throw new Error("Could not finish the copy");
+    return result;
+  } catch (error) {
+    await deleteBook(copy.id).catch(() => {});
+    throw error;
+  }
 }
 
 /**

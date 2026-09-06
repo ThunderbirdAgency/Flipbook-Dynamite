@@ -18,6 +18,7 @@ test("complete PDF lifecycle, ownership, private content, and failure recovery",
   const { POST: create, GET: library } = await import("../app/api/books/route");
   const { GET: metadata, PATCH: update, DELETE: remove } = await import("../app/api/books/[id]/route");
   const { PUT: upload, GET: pdf } = await import("../app/api/books/[id]/pdf/route");
+  const { POST: duplicate } = await import("../app/api/books/[id]/copy/route");
   const { POST: complete } = await import("../app/api/books/[id]/complete/route");
   const { POST: unlock } = await import("../app/api/books/[id]/unlock/route");
   const { POST: imageUpload, GET: imageRead } = await import("../app/api/books/[id]/asset/[kind]/route");
@@ -68,6 +69,22 @@ test("complete PDF lifecycle, ownership, private content, and failure recovery",
     assert.equal(edited.branding.seoDescription,"Steps to buying a home.");
     assert.equal(edited.overlays[0].url,"#2");
     assert.equal((await update(request("PATCH",{title:"   "}),context)).status,400);
+    // A copy retains metadata, protection, overlays and independent assets/bytes.
+    await update(request("PATCH", {password:"copy-test", visibility:"private"}),context);
+    const copiedResponse = await duplicate(request("POST"), context);
+    assert.equal(copiedResponse.status,201);
+    const copied = (await copiedResponse.json()).book;
+    const copiedContext = {params:Promise.resolve({id:copied.id})};
+    assert.notEqual(copied.id,book.id);
+    assert.equal(copied.title,"Copy of Searchable guide");
+    assert.equal(copied.visibility,"private");
+    assert.equal(copied.hasPassword,true);
+    assert.equal(copied.branding.seoTitle,"Home buyer guide");
+    assert.equal(copied.overlays[0].url,"#2");
+    assert.ok(copied.branding.logoUrl.includes(`/api/books/${copied.id}/asset/logo`));
+    assert.deepEqual(new Uint8Array(await (await pdf(request(),copiedContext)).arrayBuffer()),bytes);
+    await update(request("PATCH", {title:"Independent copy"}),copiedContext);
+    assert.equal((await getBook(book.id))?.title,"Searchable guide");
     // A different creator cannot rename/delete/read private content or assets.
     const protectedBook = { ...(await getBook(book.id))!, id: "privatebook1", ownerId: "another-user", visibility: "private" as const, passwordHash: hashPassword("first-password"), hasPassword: true };
     await createBook(protectedBook);
@@ -75,6 +92,7 @@ test("complete PDF lifecycle, ownership, private content, and failure recovery",
     const protectedAsset = { params: Promise.resolve({ id: protectedBook.id, kind: "logo" }) };
     assert.equal((await update(request("PATCH", { title: "Hacked" }), protectedContext)).status, 403);
     assert.equal((await remove(request("DELETE"), protectedContext)).status, 403);
+    assert.equal((await duplicate(request("POST"), protectedContext)).status, 403);
     assert.equal((await metadata(request(), protectedContext)).status, 401);
     assert.equal((await pdf(request(), protectedContext)).status, 401);
     assert.equal((await imageRead(request(), protectedAsset)).status, 401);
@@ -85,11 +103,14 @@ test("complete PDF lifecycle, ownership, private content, and failure recovery",
     assert.equal((await metadata(request("GET", undefined, cookie), protectedContext)).status, 200);
     await updateBook(protectedBook.id, { passwordHash: hashPassword("second-password") });
     assert.equal((await metadata(request("GET", undefined, cookie), protectedContext)).status, 401);
-    assert.equal((await (await library()).json()).books.length, 1);
+    assert.equal((await (await library()).json()).books.length, 2);
     assert.equal((await remove(request("DELETE"), context)).status, 200);
     assert.equal((await metadata(request(), context)).status, 404);
     assert.equal((await pdf(request(), context)).status, 404);
     assert.equal((await imageRead(request(), assetContext)).status, 404);
+    assert.equal((await pdf(request(),copiedContext)).status,200);
+    assert.equal((await imageRead(request(),{params:Promise.resolve({id:copied.id,kind:"logo"})})).status,200);
+    await remove(request("DELETE"),copiedContext);
     await Promise.all(Array.from({ length: 5 }, (_, i) => createBook({ ...protectedBook, id: "concurrent" + i, ownerId: "local-demo" })));
     assert.equal((await listBooks("local-demo")).length, 5);
     await writeFile(path.join(dir, "books.json"), "corrupted index");
