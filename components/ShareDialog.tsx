@@ -32,10 +32,15 @@ export default function ShareDialog({
   onPrivacyChange,
 }: ShareDialogProps) {
   const [tab, setTab] = useState(initialTab);
+  const [page,setPage]=useState("");
+  const [height,setHeight]=useState(600);
+  const [customUrl,setCustomUrl]=useState("");
+  useEffect(()=>{if(!open||!isOwner||!bookId)return;let alive=true;fetch('/api/publishing').then(r=>r.ok?r.json():null).then(d=>{const item=d?.items?.find((i:{kind:string;id:string;data:{book?:string;enabled?:boolean}})=>i.kind==='custom'&&i.data.book===bookId&&i.data.enabled!==false);if(alive&&item)setCustomUrl(`${location.origin}/go/${item.id.slice(7)}`);}).catch(()=>{});return()=>{alive=false;};},[open,isOwner,bookId]);
+  const resolvedShareUrl=page?`${shareUrl}${shareUrl.includes('?')?'&':'?'}page=${page}`:customUrl||shareUrl;
   if (!open) return null;
 
   const embedCode = embedUrl
-    ? `<iframe src="${embedUrl}" width="100%" height="600" style="border:0;border-radius:8px;" allowfullscreen loading="lazy" title="${title.replace(/"/g, "&quot;")}"></iframe>`
+    ? `<iframe src="${embedUrl}" width="100%" height="${height}" style="border:0;border-radius:8px;" allowfullscreen loading="lazy" title="${title.replace(/"/g, "&quot;")}"></iframe>`
     : null;
 
   return (
@@ -70,9 +75,9 @@ export default function ShareDialog({
         <nav aria-label="Sharing options" className="mb-6 flex gap-2 border-b border-slate-700 pb-3">
           {([['link','Flipbook link'], ...(embedCode ? [['embed','Embed']] : []), ...(isOwner ? [['privacy','Privacy']] : [])]).map(([id,label]) => <button key={id} aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id as typeof tab)} className={`rounded-lg px-3 py-2 text-sm ${tab === id ? 'bg-amber-400/10 text-amber-300' : 'text-slate-400 hover:text-white'}`}>{label}</button>)}
         </nav>
-        {tab === "link" && <><CopyField label="Flipbook link" value={shareUrl} /><SharePanel shareUrl={shareUrl} title={title} /></>}
+        {tab === "link" && <><CopyField label="Flipbook link" value={resolvedShareUrl} /><label className="mb-4 block text-sm text-slate-300">Open at page (optional)<input type="number" min="1" max="100000" value={page} onChange={e=>setPage(e.target.value)} className="ml-3 w-20 rounded border border-slate-700 bg-slate-950 p-2"/></label><SharePanel shareUrl={resolvedShareUrl} title={title} /></>}
         {tab === "embed" && embedCode && (
-          <CopyField label="Embed on your website" value={embedCode} multiline />
+          <><label className="mb-4 block text-sm text-slate-300">Embed height (pixels)<input type="number" min="200" max="2000" value={height} onChange={e=>setHeight(Math.max(200,Math.min(2000,Number(e.target.value))))} className="ml-3 w-24 rounded border border-slate-700 bg-slate-950 p-2"/></label><CopyField label="Embed on your website" value={embedCode} multiline /></>
         )}
 
 
@@ -89,7 +94,7 @@ export default function ShareDialog({
   );
 }
 
-function SharePanel({ shareUrl, title }: { shareUrl: string; title: string }) {
+export function SharePanel({ shareUrl, title }: { shareUrl: string; title: string }) {
   const [qr, setQr] = useState<string>("");
 
   useEffect(() => {
@@ -289,7 +294,7 @@ function VisibilityOption({
   );
 }
 
-function CopyField({ label, value, multiline }: { label: string; value: string; multiline?: boolean }) {
+export function CopyField({ label, value, multiline }: { label: string; value: string; multiline?: boolean }) {
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {

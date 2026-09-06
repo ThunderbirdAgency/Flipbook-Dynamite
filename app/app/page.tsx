@@ -26,7 +26,7 @@ export default async function AppPage() {
         <Link href="/app" className="flex items-center gap-2.5">
           <Logo />
           <span className="text-lg font-bold tracking-tight text-white">
-            Flipbook <span className="text-amber-400">Dynamite</span>
+            Flipbook <span className="text-amber-400" aria-label="Dynamite">Dynam<span aria-hidden="true">🧨</span>te</span>
           </span>
         </Link>
         <div className="flex items-center gap-3">

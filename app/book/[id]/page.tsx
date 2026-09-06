@@ -24,6 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
+    icons: !priv && b.faviconUrl ? {icon:b.faviconUrl} : undefined,
     openGraph: { title, description, type: "article" },
     twitter: { card: "summary", title, description },
     // Keep private/protected books out of search engines.

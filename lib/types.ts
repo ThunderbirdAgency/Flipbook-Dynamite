@@ -27,6 +27,20 @@ export interface Overlay {
 
 /** Per-book branding / white-label settings. All fields optional. */
 export interface Branding {
+  allowShare?: boolean;
+  allowSearch?: boolean;
+  allowZoom?: boolean;
+  allowFullscreen?: boolean;
+  allowThumbnails?: boolean;
+  allowToc?: boolean;
+  allowAutoplay?: boolean;
+  showCover?: boolean;
+  shadow?: number;
+  ctaLabel?: string;
+  ctaUrl?: string;
+  faviconUrl?: string;
+  toc?: {title:string;pageIndex:number;depth:number}[];
+
   /** Stage background color (any CSS color). */
   bgColor?: string;
   /** Stage background image URL (served publicly; shown behind the book). */

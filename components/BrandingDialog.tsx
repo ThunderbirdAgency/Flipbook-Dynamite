@@ -12,6 +12,8 @@ interface Props {
 }
 
 export default function BrandingDialog({ open, onClose, bookId, branding, onChange }: Props) {
+  const [extra,setExtra]=useState<Branding>(branding);
+  const extraField=(key:"ctaLabel"|"ctaUrl"|"faviconUrl",label:string)=><label className="mb-4 block text-sm text-slate-300">{label}<input value={extra[key]||""} onChange={e=>setExtra({...extra,[key]:e.target.value})} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-white"/></label>;
   const [tab, setTab] = useState("appearance");
   const [previewVersion, setPreviewVersion] = useState(0);
   const [pageSound, setPageSound] = useState(branding.pageSound !== false);
@@ -86,6 +88,7 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           branding: {
+            ...extra,
             bgColor,
             accent,
             logoLink: logoLink.trim() || null,
@@ -138,9 +141,9 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
           </button>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[170px_minmax(0,1fr)_minmax(0,1.1fr)]">
-        <nav aria-label="Customization settings" className="flex flex-wrap gap-2 lg:block lg:space-y-2">
-          {[["appearance", "Appearance"], ["branding", "Branding"], ["reader", "Reader controls"], ["search", "Search & sharing"]].map(([id, label]) => <button key={id} onClick={() => setTab(id)} aria-current={tab === id ? "page" : undefined} className={`rounded-xl px-4 py-3 text-left text-sm lg:w-full ${tab === id ? "bg-amber-400/10 text-amber-300" : "text-slate-400 hover:bg-slate-800"}`}>{label}</button>)}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <nav aria-label="Customization settings" className="flex flex-wrap gap-2 border-b border-slate-700 pb-4 lg:col-span-2">
+          {[["appearance", "Appearance"], ["branding", "Branding"], ["reader", "Reader controls"], ["search", "Title & description"], ["toc", "Table of contents"], ["layout", "Layout & interaction"]].map(([id, label]) => <button key={id} onClick={() => setTab(id)} aria-current={tab === id ? "page" : undefined} className={`rounded-xl px-4 py-3 text-left text-sm ${tab === id ? "bg-amber-400/10 text-amber-300" : "text-slate-400 hover:bg-slate-800"}`}>{label}</button>)}
         </nav>
         <div className="min-w-0 rounded-xl border border-slate-800 p-5">
         <div hidden={tab !== "appearance"}>
@@ -195,6 +198,9 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
 
         </div>
         <div hidden={tab !== "branding"}><h3 className="mb-4 text-lg font-semibold">Your brand</h3>
+        {extraField("ctaLabel","Call-to-action button label")}
+        {extraField("ctaUrl","Call-to-action destination (https://…)")}
+        {extraField("faviconUrl","Favicon image URL (https://…)")}
         {/* Logo */}
         <Section label="Logo (bottom-left)">
           <div className="flex flex-wrap items-center gap-3">
@@ -277,7 +283,11 @@ export default function BrandingDialog({ open, onClose, bookId, branding, onChan
           Allow viewers to download the PDF
         </label>
 
-        </div></div>
+        {([["allowShare","Share"],["allowSearch","Search"],["allowZoom","Zoom"],["allowFullscreen","Fullscreen"],["allowThumbnails","Thumbnails control"],["allowToc","Table of contents control"],["allowAutoplay","Auto page turn control"]] as const).map(([key,label])=><label key={key} className="mt-4 flex items-center gap-3 text-sm text-slate-300"><input type="checkbox" checked={extra[key]!==false} onChange={e=>setExtra({...extra,[key]:e.target.checked})}/>{label}</label>)}
+        </div>
+        <div hidden={tab!=="layout"}><h3 className="mb-4 text-lg font-semibold">Layout & interaction</h3><label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={extra.showCover!==false} onChange={e=>setExtra({...extra,showCover:e.target.checked})}/>Separate front cover</label><label className="mt-5 block text-sm">Shadow depth<input type="range" min="0" max="1" step="0.1" value={extra.shadow??0.4} onChange={e=>setExtra({...extra,shadow:Number(e.target.value)})} className="mt-3 w-full"/></label><p className="mt-5 text-sm text-slate-400">Responsive page layout adapts to the reader’s screen.</p></div>
+        <div hidden={tab!=="toc"}><h3 className="mb-4 text-lg font-semibold">Table of contents</h3><p className="mb-4 text-xs text-slate-400">Use custom headings below, or leave empty to use the PDF’s own contents. Page numbers start at 1.</p>{(extra.toc||[]).map((entry,i)=><div key={i} className="mb-3 flex gap-2"><input aria-label={`Heading ${i+1}`} value={entry.title} onChange={e=>setExtra({...extra,toc:extra.toc!.map((v,n)=>n===i?{...v,title:e.target.value}:v)})} className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 p-2 text-sm"/><input aria-label={`Page for heading ${i+1}`} type="number" min="1" value={entry.pageIndex+1} onChange={e=>setExtra({...extra,toc:extra.toc!.map((v,n)=>n===i?{...v,pageIndex:Math.max(0,Number(e.target.value)-1)}:v)})} className="w-16 rounded border border-slate-700 bg-slate-950 p-2 text-sm"/><button aria-label={`Remove heading ${i+1}`} onClick={()=>setExtra({...extra,toc:extra.toc!.filter((_,n)=>i!==n)})}>✕</button></div>)}<button className="text-sm text-amber-400" onClick={()=>setExtra({...extra,toc:[...(extra.toc||[]),{title:"New heading",pageIndex:0,depth:0}]})}>＋ Add heading</button></div>
+        </div>
         <aside className="min-w-0"><div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold">Book preview</h3><a href={`/book/${bookId}`} target="_blank" rel="noopener noreferrer" className="text-xs text-amber-400">Open full size ↗</a></div><iframe key={previewVersion} src={`/embed/${bookId}?preview=1`} title="Saved flipbook preview" className="h-[420px] w-full rounded-xl border border-slate-700" allowFullScreen /><p className="mt-3 text-xs leading-5 text-slate-400">Preview reflects saved settings. Save changes to update it. Your browser’s mute preference takes priority over the sound default.</p></aside>
         </div>
         <div className="mt-5 flex items-center justify-between border-t border-slate-800 pt-4">

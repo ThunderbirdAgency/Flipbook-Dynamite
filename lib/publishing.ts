@@ -1,0 +1,19 @@
+import "server-only";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { configuration } from "./config";
+import { requireConfiguration } from "./auth";
+import { AppError } from "./errors";
+export interface PublishingItem { id:string; owner_id:string; kind:"custom"|"track"|"shelf"; data:{title?:string; book?:string; books?:string[]; enabled?:boolean; expires?:string; color?:string; description?:string}; created_at:string }
+export interface LinkStats {opens:number;pages:number;last:string|null}
+const file=()=>path.join(process.env.FLIPBOOK_DATA_DIR||path.join(process.cwd(),"data"),"publishing.json");
+type Local={items:PublishingItem[];events:{link_id:string;page:number|null;created_at:string}[]};
+async function read():Promise<Local>{try{return JSON.parse(await fs.readFile(file(),"utf8"));}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return {items:[],events:[]};throw e;}}
+let lock=Promise.resolve();
+async function mutate(fn:(v:Local)=>void){const prev=lock;let release!:()=>void;lock=new Promise<void>(r=>release=r);await prev;try{const v=await read();fn(v);await fs.mkdir(path.dirname(file()),{recursive:true});await fs.writeFile(file()+'.tmp',JSON.stringify(v));await fs.rename(file()+'.tmp',file());}finally{release();}}
+async function rest(route:string,method='GET',body?:unknown){requireConfiguration();const k=process.env.SUPABASE_SERVICE_ROLE_KEY!;const r=await fetch(`${configuration().supabaseUrl}/rest/v1/${route}`,{method,headers:{apikey:k,Authorization:`Bearer ${k}`,'Content-Type':'application/json',Prefer:'return=representation'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});if(!r.ok){if(r.status===409)throw new AppError(409,'That custom link is already taken. Choose another.');throw new AppError(503,'Publishing tools could not save. Please try again.');}return r.status===204?null:r.json();}
+export async function publishingList(actor:string):Promise<PublishingItem[]>{requireConfiguration();return configuration().localDemo?(await read()).items.filter(i=>i.owner_id===actor):rest(`flipbook_publishing?owner_id=eq.${encodeURIComponent(actor)}&order=created_at.desc`);}
+export async function publishingGet(id:string):Promise<PublishingItem|null>{requireConfiguration();return configuration().localDemo?(await read()).items.find(i=>i.id===id)||null:(await rest(`flipbook_publishing?id=eq.${encodeURIComponent(id)}`))[0]||null;}
+export async function publishingSave(item:PublishingItem,create:boolean){requireConfiguration();if(configuration().localDemo){await mutate(v=>{const old=v.items.find(i=>i.id===item.id);if(old&&(create||old.owner_id!==item.owner_id))throw new AppError(409,'That custom link is already taken.');v.items=v.items.filter(i=>i.id!==item.id);v.items.push(item);});}else await rest(create?'flipbook_publishing':`flipbook_publishing?id=eq.${encodeURIComponent(item.id)}&owner_id=eq.${encodeURIComponent(item.owner_id)}`,create?'POST':'PATCH',item);}
+export async function publishingStats(actor:string):Promise<Record<string,LinkStats>>{if(!configuration().localDemo)return rest('rpc/flipbook_link_stats','POST',{actor});const v=await read();return Object.fromEntries(v.items.filter(i=>i.owner_id===actor&&i.kind==='track').map(i=>{const e=v.events.filter(e=>e.link_id===i.id);return [i.id,{opens:e.filter(e=>e.page===null).length,pages:e.filter(e=>e.page!==null).length,last:e.at(-1)?.created_at||null}];}));}
+export async function trackEvent(id:string,book:string,page?:number){const item=await publishingGet(id);if(!item||item.kind!=='track'||item.data.book!==book||item.data.enabled===false||(item.data.expires&&Date.parse(item.data.expires)<=Date.now()))return;const e={link_id:id,page:page??null,created_at:new Date().toISOString()};if(configuration().localDemo)await mutate(v=>{v.events.push(e);});else await rest('flipbook_link_events','POST',e);}

@@ -2,6 +2,7 @@ import { api, assertSameOrigin, readJson } from "@/lib/http";
 import { NextRequest, NextResponse } from "next/server";
 import { getBook, recordEvent, enforceRateLimit } from "@/lib/store";
 import { gateBookRequest } from "@/lib/gate";
+import { trackEvent } from "@/lib/publishing";
 import { visitorId } from "@/lib/access";
 
 export const runtime = "nodejs";
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       createdAt: new Date().toISOString(),
   });
 
+  if(typeof body.track === "string" && /^track_[A-Za-z0-9_-]{16}$/.test(body.track)) await trackEvent(body.track,id,page);
   return NextResponse.json({ ok: true });
   });
 }

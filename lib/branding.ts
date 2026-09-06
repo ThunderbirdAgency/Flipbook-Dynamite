@@ -68,10 +68,14 @@ export function mergeBranding(current: Branding, patch: BrandingPatch): Branding
   if ("allowDownload" in patch)
     apply("allowDownload", true, typeof patch.allowDownload === "boolean" ? patch.allowDownload : undefined);
 
-  for (const key of ["pageSound", "showThumbnails"] as const) {
+  for (const key of ["pageSound", "showThumbnails", "allowShare", "allowSearch", "allowZoom", "allowFullscreen", "allowThumbnails", "allowToc", "allowAutoplay", "showCover"] as const) {
     if (key in patch && (typeof patch[key] === "boolean" || patch[key] === null))
       apply(key, true, patch[key] === null ? undefined : patch[key] as boolean);
   }
 
+  for (const key of ["ctaUrl","faviconUrl"] as const) if(key in patch) apply(key,true,cleanUrl(patch[key]));
+  if("ctaLabel" in patch) apply("ctaLabel",true,cleanText(patch.ctaLabel,80));
+  if("shadow" in patch && typeof patch.shadow === "number" && Number.isFinite(patch.shadow)) next.shadow=Math.max(0,Math.min(1,patch.shadow));
+  if(Array.isArray(patch.toc)) next.toc=patch.toc.slice(0,200).filter(v=>v && typeof v.title==='string' && Number.isInteger(v.pageIndex) && v.pageIndex>=0 && v.pageIndex<100000).map(v=>({title:v.title.trim().slice(0,160),pageIndex:v.pageIndex,depth:Math.max(0,Math.min(3,Math.floor(Number(v.depth)||0)))}));
   return next;
 }

@@ -54,7 +54,7 @@ export default function FlipbookViewer({
   const [brand, setBrand] = useState<Branding>(branding);
   const [brandOpen, setBrandOpen] = useState(false);
   const [overlayList, setOverlayList] = useState<Overlay[]>(overlays);
-  const [editOpen, setEditOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(()=>isOwner && typeof window!=="undefined" && new URLSearchParams(location.search).get("edit")==="1");
   const [lightbox, setLightbox] = useState<Overlay | null>(null);
   const accent = brand.accent || "#fbbf24";
   const showDownload = brand.allowDownload !== false && Boolean(downloadUrl);
@@ -62,7 +62,8 @@ export default function FlipbookViewer({
     ? `center / cover no-repeat url("${brand.bgImageUrl}")`
     : brand.bgColor || null;
   const [pages, setPages] = useState<RenderedPage[] | null>(null);
-  const [outline, setOutline] = useState<OutlineItem[]>([]);
+  const [pdfOutline, setOutline] = useState<OutlineItem[]>([]);
+  const outline = brand.toc?.length ? brand.toc : pdfOutline;
   const [pageTexts, setPageTexts] = useState<string[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const [status, setStatus] = useState<Status>("loading");
@@ -131,7 +132,7 @@ export default function FlipbookViewer({
         reportedPages.current.add(page);
       }
       const url = `/api/books/${bookId}/events`;
-      const payload = JSON.stringify({ type, page });
+      const payload = JSON.stringify({ type, page, track: new URLSearchParams(location.search).get("track") });
       try {
         if (navigator.sendBeacon) {
           navigator.sendBeacon(url, new Blob([payload], { type: "application/json" }));
@@ -201,12 +202,12 @@ export default function FlipbookViewer({
         maxWidth: 3000,
         minHeight: 220,
         maxHeight: 3000,
-        showCover: true,
+        showCover: brand.showCover !== false,
         usePortrait: portrait,
         autoSize: true,
         // Keep the turn and paper sound on the same timing.
         drawShadow: true,
-        maxShadowOpacity: 0.4,
+        maxShadowOpacity: brand.shadow ?? 0.4,
         mobileScrollSupport: false,
         clickEventForward: true,
         showPageCorners: true,
@@ -226,6 +227,8 @@ export default function FlipbookViewer({
           if (e.data === "user_fold") { lastRustleRef.current = performance.now(); playDragSound(); }
         }
       });
+      const requestedPage=Number(new URLSearchParams(location.search).get('page'));
+      if(Number.isInteger(requestedPage)&&requestedPage>0&&requestedPage<=pages.length) flip.turnToPage(requestedPage-1);
       flipRef.current = flip;
       setCurrent(flip.getCurrentPageIndex());
     })();
@@ -240,7 +243,7 @@ export default function FlipbookViewer({
         // PageFlip.destroy throws if it never finished mounting; safe to ignore.
       }
     };
-  }, [pages, portrait]);
+  }, [pages, portrait, brand.showCover, brand.shadow]);
 
   // Keyboard navigation.
   useEffect(() => {
@@ -448,14 +451,14 @@ export default function FlipbookViewer({
       {status === "ready" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center pb-4">
           <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-1 rounded-full border border-slate-700/60 bg-slate-900/90 px-3 py-2 shadow-xl backdrop-blur">
-            <ToolbarButton
+            {brand.allowThumbnails !== false && <ToolbarButton
               label="Thumbnails"
               active={showThumbs}
               onClick={() => setShowThumbs((v) => !v)}
             >
               <ThumbsIcon />
-            </ToolbarButton>
-            {outline.length > 0 && (
+            </ToolbarButton>}
+            {brand.allowToc !== false && outline.length > 0 && (
               <ToolbarButton
                 label="Table of contents"
                 active={showToc}
@@ -467,7 +470,7 @@ export default function FlipbookViewer({
                 <TocIcon />
               </ToolbarButton>
             )}
-            <ToolbarButton
+            {brand.allowSearch !== false && <ToolbarButton
               label="Search inside"
               active={showSearch}
               onClick={() => {
@@ -476,7 +479,7 @@ export default function FlipbookViewer({
               }}
             >
               <SearchIcon />
-            </ToolbarButton>
+            </ToolbarButton>}
 
             <div className="mx-1 h-5 w-px bg-slate-700" />
 
@@ -498,16 +501,16 @@ export default function FlipbookViewer({
 
             <div className="mx-1 h-5 w-px bg-slate-700" />
 
-            <ToolbarButton
+            {brand.allowAutoplay !== false && <ToolbarButton
               label={autoplay ? "Stop autoplay" : "Autoplay"}
               active={autoplay}
               onClick={() => setAutoplay((v) => !v)}
             >
               {autoplay ? <PauseIcon /> : <PlayIcon />}
-            </ToolbarButton>
-            <ToolbarButton label="Zoom" onClick={() => setZoomOpen(true)}>
+            </ToolbarButton>}
+            {brand.allowZoom !== false && <ToolbarButton label="Zoom" onClick={() => setZoomOpen(true)}>
               <ZoomIcon />
-            </ToolbarButton>
+            </ToolbarButton>}
             <ToolbarButton
               label={muted ? "Unmute page-flip sound" : "Mute page-flip sound"}
               onClick={toggleMuted}
@@ -517,7 +520,7 @@ export default function FlipbookViewer({
 
             <div className="mx-1 h-5 w-px bg-slate-700" />
 
-            {shareUrl && (
+            {brand.allowShare !== false && shareUrl && (
               <ToolbarButton label="Share" onClick={() => setShareOpen(true)}>
                 <ShareIcon />
               </ToolbarButton>
@@ -552,16 +555,17 @@ export default function FlipbookViewer({
                 <DownloadIcon />
               </a>
             )}
-            <ToolbarButton
+            {brand.allowFullscreen !== false && <ToolbarButton
               label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               onClick={toggleFullscreen}
             >
               <FullscreenIcon exit={isFullscreen} />
-            </ToolbarButton>
+            </ToolbarButton>}
           </div>
         </div>
       )}
 
+      {brand.ctaUrl && brand.ctaLabel && <a href={brand.ctaUrl} target="_blank" rel="noopener noreferrer" className="absolute right-5 top-5 z-20 rounded-xl px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg" style={{backgroundColor:accent}}>{brand.ctaLabel}</a>}
       {/* Custom logo, bottom-left (branding) */}
       {brand.logoUrl && (
         <div className="pointer-events-none absolute bottom-4 left-4 z-20">
