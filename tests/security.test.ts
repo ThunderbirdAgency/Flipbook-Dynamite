@@ -52,3 +52,14 @@ test("stream limits apply even when Content-Length is absent or false", async ()
   await assert.rejects(readJson(new Request("https://flip.example", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{" })));
   await assert.rejects(readJson(new Request("https://flip.example", { method: "POST", body: "{}" })));
 });
+
+test("creator and book pages reject cross-site framing without blocking embed pages", async () => {
+  const { default: config } = await import("../next.config");
+  const rules = await config.headers!();
+  for (const route of ["/app/:path*", "/book/:path*", "/sign-in/:path*", "/sign-up/:path*"]) {
+    const rule = rules.find(r => r.source === route && r.headers.some(h => h.key === "X-Frame-Options"));
+    assert.ok(rule, `${route} must have anti-framing headers`);
+    assert.ok(rule.headers.some(h => h.key === "Content-Security-Policy" && h.value.includes("frame-ancestors 'self'")));
+  }
+  assert.equal(rules.some(r => r.source.startsWith("/embed") && r.headers.some(h => h.key === "X-Frame-Options")), false);
+});

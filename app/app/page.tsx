@@ -50,7 +50,7 @@ export default async function AppPage() {
       </header>
 
       {showLibrary ? (
-        <Library />
+        <Library key={userId || "local-demo"} userId={userId || "local-demo"} />
       ) : (
         <section className="mx-auto w-full max-w-6xl px-6 pb-20">
           <div className="rounded-3xl border-2 border-dashed border-slate-700 bg-slate-900/40 px-8 py-16 text-center">

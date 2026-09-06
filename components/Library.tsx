@@ -8,6 +8,7 @@ import { renderFirstPage } from "@/lib/pdf-client";
 import ShareDialog from "./ShareDialog";
 import PublishingPanel from "./PublishingPanel";
 import BrandingDialog from "./BrandingDialog";
+import QuickStart from "./QuickStart";
 
 const field = "w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-amber-400";
 const button = "rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-slate-500 hover:text-white disabled:opacity-40";
@@ -18,7 +19,7 @@ async function request(url: string, method = "GET", body?: object) {
  return data;
 }
 type Form = { kind: "folder" | "renameFolder" | "renameBook" | "deleteFolder" | "deleteBook"; id?:string; name:string };
-export default function Library() {
+export default function Library({ userId }: { userId: string }) {
  const [section,setSection]=useState<"books"|"custom"|"track"|"shelf">("books");
  const [books,setBooks] = useState<Book[] | null>(null);
  const [workspace,setWorkspace] = useState<Workspace | null>(null);
@@ -140,6 +141,7 @@ export default function Library() {
  return <div className="mx-auto max-w-[1500px] px-4 pb-16 sm:px-8">
   <nav aria-label="Workspace navigation" className="flex flex-wrap gap-2 border-y border-slate-800 py-3">
    {([["books","Flipbooks"],["shelf","Bookshelves"],["custom","Custom links"],["track","Trackable links"]] as const).map(([id,label])=><button key={id} onClick={()=>setSection(id)} aria-current={section===id?"page":undefined} className={`rounded-lg px-5 py-3 text-sm font-medium ${section===id?"bg-amber-400/10 text-amber-300":"text-slate-400 hover:bg-slate-800 hover:text-white"}`}>{label}</button>)}
+   <QuickStart userId={userId} />
   </nav>
   {section!=="books"?<PublishingPanel key={section} kind={section} books={books||[]}/>:<>
   <div className="mb-5 flex flex-wrap items-end justify-between gap-4 border-t border-slate-800 pt-5">

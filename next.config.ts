@@ -12,6 +12,12 @@ const nextConfig: NextConfig = {
         { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         { key: "Content-Security-Policy", value: "object-src 'none'; base-uri 'self'" },
       ] },
+      ...["/app/:path*", "/book/:path*", "/sign-in/:path*", "/sign-up/:path*", "/api/:path*"].map(source => ({
+        source, headers: [
+          { key: "Content-Security-Policy", value: "object-src 'none'; base-uri 'self'; frame-ancestors 'self'" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+        ],
+      })),
       // Public /embed pages deliberately remain embeddable on agents' websites.
       { source: "/", headers: [{ key: "Content-Security-Policy", value: "object-src 'none'; base-uri 'self'; frame-ancestors 'self'" }] },
     ];
