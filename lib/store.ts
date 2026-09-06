@@ -590,7 +590,7 @@ export async function completeUpload(book: StoredBook): Promise<StoredBook> {
   let actualSize: number;
   if (supabaseMode) {
     const res = await fetch(`${SUPABASE_URL}/storage/v1/object/authenticated/${BUCKET}/${book.id}.pdf`, {
-      headers: sbHeaders({ Range: "bytes=0-1023" }), cache: "no-store",
+      headers: sbHeaders({ Range: "bytes=0-1023" }), cache: "no-store", signal: AbortSignal.timeout(20000),
     });
     if (!res.ok || !res.body) throw new AppError(409, "The PDF has not finished uploading. Please try again.");
     const range = res.headers.get("content-range")?.match(/\/(\d+)$/);
@@ -606,7 +606,12 @@ export async function completeUpload(book: StoredBook): Promise<StoredBook> {
         prefix.set(part, length);
         length += part.length;
       }
-    } finally { await reader.cancel(); reader.releaseLock(); }
+    } finally {
+      // Cancellation may wait for an upstream full-file response. Publishing only
+      // needs the validated prefix; do not await transport cleanup.
+      void reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
     prefix = prefix.subarray(0, length);
   } else {
     let handle;

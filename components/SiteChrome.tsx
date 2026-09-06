@@ -17,7 +17,7 @@ export function Wordmark({ className = "" }: { className?: string }) {
         </svg>
       </span>
       <span className="text-sm font-bold tracking-tight text-white sm:text-lg">
-        Flipbook <span className="text-amber-400">Dynamite</span>
+        Flipbook <span className="text-amber-400" aria-label="Dynamite"><span aria-hidden="true">Dynam<span className="inline-block text-[0.85em]">🧨</span>te</span></span>
       </span>
     </Link>
   );

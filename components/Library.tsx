@@ -11,7 +11,7 @@ import BrandingDialog from "./BrandingDialog";
 const field = "w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none focus:border-amber-400";
 const button = "rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-slate-500 hover:text-white disabled:opacity-40";
 async function request(url: string, method = "GET", body?: object) {
- const res = await fetch(url, { method, cache: "no-store", ...(body ? {headers:{"Content-Type":"application/json"},body:JSON.stringify(body)} : {}) });
+ const res = await fetch(url, { method, cache: "no-store", signal: AbortSignal.timeout(45000), ...(body ? {headers:{"Content-Type":"application/json"},body:JSON.stringify(body)} : {}) });
  const data = await res.json().catch(() => ({}));
  if (!res.ok) throw new Error(data.error || "We couldn't save that change. Please try again.");
  return data;
@@ -26,6 +26,7 @@ export default function Library() {
  const [uploading,setUploading] = useState(false);
  const [stage,setStage] = useState("");
  const [busy,setBusy] = useState(false);
+ const [checking,setChecking] = useState<string | null>(null);
  const [query,setQuery] = useState("");
  const [scope,setScope] = useState("all");
  const [sort,setSort] = useState("newest");
@@ -97,9 +98,9 @@ export default function Library() {
   finally { setUploading(false); setStage(""); await refresh(); }
  };
  const complete = async(book:Book) => {
-  setBusy(true); setError("");
+  setBusy(true); setChecking(book.id); setError("");
   try { await request(`/api/books/${book.id}/complete`,"POST"); setNotice("Upload verified. Your flipbook is ready."); await refresh(); }
-  catch(e) { setError((e as Error).message); } finally { setBusy(false); }
+  catch(e) { setError((e as Error).name === "TimeoutError" ? "Verification timed out. Your PDF is saved. Please try Check upload again shortly." : (e as Error).message); } finally { setBusy(false); setChecking(null); }
  };
  const all = books || [];
  const folders = workspace?.folders || [];
@@ -151,7 +152,7 @@ export default function Library() {
       <div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate font-medium text-white" title={book.title}>{book.title}</h3><p className="mt-1 text-xs text-slate-500">{new Date(book.createdAt).toLocaleDateString()} · {formatSize(book.size)}</p></div><span className={`shrink-0 rounded-md px-2 py-1 text-[10px] ${book.status === "pending" ? "bg-amber-400/10 text-amber-300" : "bg-slate-800 text-slate-300"}`}>{book.status === "pending" ? "Unfinished" : book.hasPassword ? "Password" : book.visibility === "private" ? "Private" : "Shared by link"}</span></div>
       <div className="mt-3 flex flex-wrap items-center gap-2"><select aria-label={`Folder for ${book.title}`} disabled={busy} value={placements[book.id] || ""} onChange={e=>move(book.id,e.target.value)} className="max-w-44 rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-400"><option value="">Unfiled</option>{folders.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select><span className="text-xs tabular-nums text-slate-500">{book.status === "ready" ? `${views[book.id] || 0} views` : "PDF not published"}</span></div>
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-       {book.status === "ready" ? <><Link href={`/book/${book.id}`} className="font-medium text-amber-400">Open / edit</Link><button onClick={()=>setBranding(book)} className="text-slate-300">Branding</button><button onClick={()=>setShare(book)} className="text-slate-300">Share & privacy</button><Link href={`/book/${book.id}/insights`} className="text-slate-300">Analytics</Link><button onClick={()=>openForm({kind:"renameBook",id:book.id,name:book.title})} className="text-slate-400">Rename</button><a href={`/api/books/${book.id}/pdf?download=1`} className="text-slate-400">PDF ↓</a></> : <button disabled={busy} onClick={()=>complete(book)} className="text-amber-400">Check upload</button>}
+       {book.status === "ready" ? <><Link href={`/book/${book.id}`} className="font-medium text-amber-400">Open / edit</Link><button onClick={()=>setBranding(book)} className="text-slate-300">Branding</button><button onClick={()=>setShare(book)} className="text-slate-300">Share & privacy</button><Link href={`/book/${book.id}/insights`} className="text-slate-300">Analytics</Link><button onClick={()=>openForm({kind:"renameBook",id:book.id,name:book.title})} className="text-slate-400">Rename</button><a href={`/api/books/${book.id}/pdf?download=1`} className="text-slate-400">PDF ↓</a></> : <><button disabled={busy} onClick={()=>complete(book)} className="rounded-lg border border-amber-400/40 px-3 py-2 text-amber-400 disabled:opacity-60">{checking === book.id ? "Checking PDF…" : "Check upload"}</button>{checking === book.id && <span role="status" className="text-slate-300">Verifying your saved PDF…</span>}</>}
        <button disabled={busy} onClick={()=>openForm({kind:"deleteBook",id:book.id,name:book.title})} aria-label={`Delete ${book.title}`} className="rounded-lg border border-red-500/30 px-3 py-2 text-red-300 hover:bg-red-500/10">{book.status === "pending" ? "Delete unfinished upload" : "Delete flipbook"}</button>
       </div></div>
      </article>)}
