@@ -79,7 +79,7 @@ export function playFlipSound() {
   const now = ctx.currentTime;
   if (activeSource || now - lastPlayedAt < FLIP_DURATION_MS / 1000) return;
   lastPlayedAt = now;
-  swish(ctx, now, 0.38, 650, 2200, 0.12);
+  swish(ctx, now, 0.38, 650, 2200, 0.32);
 }
 
 export function stopFlipSound() {
