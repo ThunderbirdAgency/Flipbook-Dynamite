@@ -1,6 +1,8 @@
 // Synthesized paper page-flip sound via Web Audio — no audio asset needed.
 // Two layered noise swishes (slide + settle) approximate a real page turn.
 
+export const FLIP_DURATION_MS = 650;
+
 let audioCtx: AudioContext | null = null;
 let noiseBuffer: AudioBuffer | null = null;
 
@@ -21,7 +23,7 @@ function getContext(): AudioContext | null {
 
 function getNoise(ctx: AudioContext): AudioBuffer {
   if (!noiseBuffer) {
-    const length = Math.floor(ctx.sampleRate * 0.5);
+    const length = Math.floor(ctx.sampleRate * 1.5);
     noiseBuffer = ctx.createBuffer(1, length, ctx.sampleRate);
     const data = noiseBuffer.getChannelData(0);
     for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
@@ -56,6 +58,12 @@ function swish(
   gain.connect(ctx.destination);
   src.start(when, Math.random() * 0.2, duration + 0.05);
   src.stop(when + duration + 0.05);
+  src.onended = () => { src.disconnect(); filter.disconnect(); gain.disconnect(); };
+}
+
+export function prepareFlipSound() {
+  const ctx = getContext();
+  if (ctx) getNoise(ctx);
 }
 
 export function playFlipSound() {
@@ -63,7 +71,8 @@ export function playFlipSound() {
   if (!ctx) return;
   const now = ctx.currentTime;
   // Main swish: the page sliding through the air.
-  swish(ctx, now, 0.22, 700, 2800, 0.28);
+  const duration = FLIP_DURATION_MS / 1000;
+  swish(ctx, now, duration * 0.8, 650, 2400, 0.16);
   // Softer, lower tail: the page settling down.
-  swish(ctx, now + 0.16, 0.14, 2200, 500, 0.12);
+  swish(ctx, now + duration * 0.65, duration * 0.35, 1800, 450, 0.06);
 }

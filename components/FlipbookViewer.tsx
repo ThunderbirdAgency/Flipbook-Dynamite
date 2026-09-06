@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PageFlip } from "page-flip";
 import { renderPdfToPages, OutlineItem, RenderedPage } from "@/lib/pdf-client";
-import { playFlipSound } from "@/lib/flip-sound";
+import { FLIP_DURATION_MS, playFlipSound, prepareFlipSound } from "@/lib/flip-sound";
 import ShareDialog from "@/components/ShareDialog";
 import BrandingDialog from "@/components/BrandingDialog";
 import ZoomOverlay from "@/components/ZoomOverlay";
@@ -192,13 +192,13 @@ export default function FlipbookViewer({
         showCover: true,
         usePortrait: portrait,
         autoSize: true,
-        // Deeper fold shadows + a weightier turn read as a heavier, realer book.
+        // Keep the turn and paper sound on the same timing.
         drawShadow: true,
-        maxShadowOpacity: 0.65,
+        maxShadowOpacity: 0.4,
         mobileScrollSupport: false,
         clickEventForward: true,
         showPageCorners: true,
-        flippingTime: 800,
+        flippingTime: FLIP_DURATION_MS,
       });
       flip.loadFromHTML(bookRef.current.querySelectorAll(".fb-page"));
       flip.on("flip", (e) => {
@@ -289,6 +289,8 @@ export default function FlipbookViewer({
   return (
     <div
       ref={containerRef}
+      onPointerDownCapture={() => { if (!mutedRef.current) prepareFlipSound(); }}
+      onKeyDownCapture={() => { if (!mutedRef.current) prepareFlipSound(); }}
       className="relative flex h-full w-full flex-col overflow-hidden bg-slate-950"
       style={{ ["--fb-accent" as string]: accent } as React.CSSProperties}
     >
