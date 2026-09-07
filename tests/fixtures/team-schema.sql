@@ -42,7 +42,9 @@ begin
  elsif action in ('role','remove') then
   select role into target_role from flipbook_team_members where owner_id=workspace and user_id=payload->>'userId';
   if target_role is null or (actor_role='admin' and target_role='admin') then raise exception 'team_denied'; end if;
-  if action='remove' then delete from flipbook_team_members where owner_id=workspace and user_id=payload->>'userId';
+  if action='remove' then
+   delete from flipbook_team_invites where owner_id=workspace and email=(select email from flipbook_team_members where owner_id=workspace and user_id=payload->>'userId');
+   delete from flipbook_team_members where owner_id=workspace and user_id=payload->>'userId';
   else
    if payload->>'role' not in ('admin','editor','viewer') or (actor_role='admin' and payload->>'role'='admin') then raise exception 'team_denied'; end if;
    update flipbook_team_members set role=payload->>'role' where owner_id=workspace and user_id=payload->>'userId';

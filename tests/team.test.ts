@@ -29,7 +29,8 @@ test('team SQL denies direct access, binds invitations to verified emails, consu
  await assert.rejects(call('owner','owner','remove',{userId:'owner'}),/team_denied/);
  await call('owner','owner','role',{userId:'editor',role:'viewer'});
  assert.equal((await db.query<{role:string}>("select role from flipbook_team_members where user_id='editor'")).rows[0].role,'viewer');
- await call('owner','owner','remove',{userId:'editor'});assert.equal((await db.query("select * from flipbook_team_members where user_id='editor'")).rows.length,0);
+ await call('owner','owner','invite',{id:'oldeditor',email:'editor@example.com',role:'editor',hash:'oldeditor'});
+ await call('owner','owner','remove',{userId:'editor'});await assert.rejects(call('editor','','accept',{hash:'oldeditor',emails:['editor@example.com']}),/invite_invalid/);assert.equal((await db.query("select * from flipbook_team_members where user_id='editor'")).rows.length,0);
  await call('owner','owner','invite',{id:'expired',email:'x@example.com',role:'viewer',hash:'expired'});await db.exec("update flipbook_team_invites set expires_at=now()-interval '1 minute' where id='expired'");await assert.rejects(call('x','','accept',{hash:'expired',emails:['x@example.com']}),/invite_invalid/);
  await call('owner','owner','invite',{id:'revoked',email:'x@example.com',role:'viewer',hash:'revoked'});await call('owner','owner','revoke',{id:'revoked'});await assert.rejects(call('x','','accept',{hash:'revoked',emails:['x@example.com']}),/invite_invalid/);
  }finally{await db.close();}

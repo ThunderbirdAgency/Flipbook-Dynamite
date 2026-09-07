@@ -64,7 +64,7 @@ export async function changeTeam(actor:string,workspace:string,action:string,pay
     const i=state.invites.find(i=>i.id===payload.id&&i.owner_id===workspace);if(!i||!canAssign(role,i.role,'viewer'))throw new AppError(403,'Role not allowed.');state.invites=state.invites.filter(v=>v!==i);
    }else if(action==='role'||action==='remove'){
     const m=state.members.find(m=>m.owner_id===workspace&&m.user_id===payload.userId);if(!m||!canAssign(role,m.role,action==='remove'?'viewer':next)||action==='role'&&!['admin','editor','viewer'].includes(next))throw new AppError(403,'Role not allowed.');
-    if(action==='remove')state.members=state.members.filter(v=>v!==m);else m.role=next;
+    if(action==='remove'){state.invites=state.invites.filter(i=>i.owner_id!==workspace||i.email!==m.email);state.members=state.members.filter(v=>v!==m);}else m.role=next;
    }else throw new AppError(400,'Unknown team action.');
   }
   await fs.mkdir(path.dirname(file()),{recursive:true});await fs.writeFile(file()+'.tmp',JSON.stringify(state));await fs.rename(file()+'.tmp',file());return result;
