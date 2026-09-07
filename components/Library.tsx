@@ -81,7 +81,7 @@ export default function Library({ userId }: { userId: string }) {
    for (const [index,file] of pdfs.entries()) {
     const label = `${index+1} of ${pdfs.length}: ${file.name}`;
     setStage(`Preparing ${label}`);
-    const data = await request("/api/books","POST",{fileName:file.name,size:file.size});
+    const data = await request("/api/books","POST",{fileName:file.name,size:file.size,visibility:"private"});
     setStage(`Uploading ${label}`);
     const up = await fetch(data.upload.url,{method:data.upload.method,headers:{...data.upload.headers,"Content-Type":"application/pdf"},body:file});
     if(!up.ok) {
@@ -258,7 +258,7 @@ function UploadZone({
             Drop a PDF here, or <span className="text-amber-400">browse</span>
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            It becomes an interactive flipbook with a shareable link — up to 100 MB
+            Uploads start private. Choose sharing access when ready — up to 100 MB
           </p>
         </>
       )}
