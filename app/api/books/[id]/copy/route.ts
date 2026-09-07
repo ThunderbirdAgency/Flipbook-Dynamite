@@ -1,3 +1,4 @@
+import { hasPermission } from "@/lib/team";
 import { NextRequest, NextResponse } from "next/server";
 import { api, assertSameOrigin } from "@/lib/http";
 import { requireUserId } from "@/lib/auth";
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const userId = await requireUserId();
     const book = await getBook((await params).id);
     if (!book) return NextResponse.json({ error: "Flipbook not found" }, { status: 404 });
-    if (book.ownerId !== userId) return NextResponse.json({ error: "Not your book" }, { status: 403 });
+    if (!await hasPermission(book.ownerId, "edit")) return NextResponse.json({ error: "Not your book" }, { status: 403 });
     await enforceRateLimit(`copy:${userId}`, 5);
     return NextResponse.json({ book: toPublicBook(await copyBook(book)) }, { status: 201 });
   });

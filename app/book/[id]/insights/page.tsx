@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBook } from "@/lib/store";
-import { currentUserId } from "@/lib/auth";
+import { hasPermission } from "@/lib/team";
 import InsightsClient from "./client";
 
 type Props = { params: Promise<{ id: string }> };
@@ -14,8 +14,7 @@ export default async function InsightsPage({ params }: Props) {
   if (!book) notFound();
 
   {
-    const userId = await currentUserId();
-    if (!userId || book.ownerId !== userId) notFound();
+    if (!await hasPermission(book.ownerId, "read")) notFound();
   }
 
   return (

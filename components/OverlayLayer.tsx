@@ -66,6 +66,14 @@ export function OverlayItem({
   }
 
   if (o.type === "image") {
+    if (o.display === "popup") return (
+      <button type="button" style={boxStyle(o)} className="fb-overlay overflow-hidden rounded ring-1 ring-white/40"
+        title={o.label || "Open image"} aria-label={o.label || "Open image"} {...stop}
+        onClick={e => { e.stopPropagation(); onOpen(o); }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt={o.label || "Open image"} className="h-full w-full object-contain" draggable={false} />
+      </button>
+    );
     // Inline image / GIF layer placed on the page.
     return (
       <div style={boxStyle(o)} className="fb-overlay" {...stop}>

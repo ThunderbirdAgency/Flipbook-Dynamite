@@ -1,7 +1,7 @@
 import { api, assertSameOrigin, readJson } from "@/lib/http";
 import { NextRequest, NextResponse } from "next/server";
 import { deleteBook, getBook, updateBook, enforceRateLimit, type BookPatch } from "@/lib/store";
-import { currentUserId } from "@/lib/auth";
+import { hasPermission } from "@/lib/team";
 import { hashPassword } from "@/lib/access";
 import { parseTitle } from "@/lib/validation";
 import { mergeBranding } from "@/lib/branding";
@@ -15,8 +15,7 @@ type Params = { params: Promise<{ id: string }> };
 
 /** In auth mode, only the book's owner may modify or delete it. */
 async function canManage(book: StoredBook): Promise<boolean> {
-  const userId = await currentUserId();
-  return Boolean(userId && book.ownerId === userId);
+  return hasPermission(book.ownerId, "edit");
 }
 
 export async function GET(req: NextRequest, { params }: Params) {
@@ -91,7 +90,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     const { id } = await params;
     const book = await getBook(id, true);
     if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (!(await canManage(book))) {
+    if (!(await hasPermission(book.ownerId, "delete"))) {
       return NextResponse.json({ error: "Not your book" }, { status: 403 });
     }
     const ok = await deleteBook(id);

@@ -1,13 +1,13 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {nanoid} from 'nanoid';
 import {api,assertSameOrigin,readJson} from '@/lib/http';
-import {requireUserId} from '@/lib/auth';
+import {activeWorkspace} from '@/lib/team';
 import {getBook,enforceRateLimit} from '@/lib/store';
 import {publishingList,publishingGet,publishingSave,publishingStats, type PublishingItem} from '@/lib/publishing';
 import {AppError} from '@/lib/errors';
-export async function GET(){return api(async()=>{const actor=await requireUserId();return NextResponse.json({items:await publishingList(actor),stats:await publishingStats(actor)});});}
+export async function GET(req:NextRequest){return api(async()=>{const {ownerId:actor}=await activeWorkspace("read",req);return NextResponse.json({items:await publishingList(actor),stats:await publishingStats(actor)});});}
 export async function POST(req:NextRequest){return api(async()=>{
- assertSameOrigin(req);const actor=await requireUserId();await enforceRateLimit(`publishing:${actor}`,60);const b=await readJson(req,65536);
+ assertSameOrigin(req);const {ownerId:actor}=await activeWorkspace("edit",req);await enforceRateLimit(`publishing:${actor}`,60);const b=await readJson(req,65536);
  if(!b||!['custom','track','shelf'].includes(b.kind))throw new AppError(400,'Choose a publishing tool.');
  const existing=b.id?await publishingGet(String(b.id)):null;
  if(b.id&&(!existing||existing.owner_id!==actor||existing.kind!==b.kind))throw new AppError(403,'This item is not in your workspace.');

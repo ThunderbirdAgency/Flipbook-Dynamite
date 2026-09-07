@@ -1,7 +1,7 @@
 import { api } from "@/lib/http";
 import { NextRequest, NextResponse } from "next/server";
 import { getBook, getStats } from "@/lib/store";
-import { currentUserId } from "@/lib/auth";
+import { hasPermission } from "@/lib/team";
 
 export const runtime = "nodejs";
 
@@ -16,8 +16,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
     // In open mode (no auth) anyone with the link is effectively the owner.
     {
-      const userId = await currentUserId();
-      if (!userId || book.ownerId !== userId) {
+      if (!await hasPermission(book.ownerId, "read")) {
         return NextResponse.json({ error: "Not your book" }, { status: 403 });
       }
     }

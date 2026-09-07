@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { api, assertSameOrigin, readJson } from "@/lib/http";
-import { requireUserId } from "@/lib/auth";
+import { activeWorkspace } from "@/lib/team";
 import { enforceRateLimit } from "@/lib/store";
 import { changeWorkspace, getWorkspace, type WorkspaceChange } from "@/lib/workspace";
 import { AppError } from "@/lib/errors";
 export const runtime = "nodejs";
-export async function GET() { return api(async () => NextResponse.json(await getWorkspace(await requireUserId()))); }
+export async function GET(req:NextRequest) { return api(async () => NextResponse.json(await getWorkspace((await activeWorkspace("read",req)).ownerId))); }
 export async function POST(req: NextRequest) {
  return api(async () => {
   assertSameOrigin(req);
-  const actor = await requireUserId();
+  const {ownerId:actor} = await activeWorkspace("edit",req);
   await enforceRateLimit(`workspace:${actor}`,60);
   const body = await readJson(req);
   if (!body || !["create","rename","delete","move"].includes(body.action)) throw new AppError(400,"Choose a valid workspace action.");

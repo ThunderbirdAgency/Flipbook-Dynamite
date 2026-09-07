@@ -1,3 +1,4 @@
+import BrandLogo from "./BrandLogo";
 import Link from "next/link";
 import { authEnabled } from "@/lib/auth";
 import AccountControls from "./AccountControls";
@@ -10,15 +11,7 @@ const startHref = authEnabled ? "/sign-up" : "/app";
 export function Wordmark({ className = "" }: { className?: string }) {
   return (
     <Link href="/" className={`flex items-center gap-2.5 ${className}`}>
-      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 text-slate-950 shadow-[0_0_20px_-4px_rgba(251,146,60,0.7)]">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-        </svg>
-      </span>
-      <span className="text-sm font-bold tracking-tight text-white sm:text-lg">
-        Flipbook <span className="text-amber-400" aria-label="Dynamite"><span aria-hidden="true">Dynam<span className="inline-block text-[0.85em]">🧨</span>te</span></span>
-      </span>
+      <BrandLogo />
     </Link>
   );
 }

@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { accessCookieName, decideAccess, verifyAccessToken, type AccessDecision } from "./access";
 import { currentUserId } from "./auth";
+import { memberRole } from "./team";
+import { permits } from "./team-permissions";
 import type { StoredBook } from "./types";
 
 export interface GateResult {
@@ -30,16 +32,17 @@ export async function gateBookRSC(book: StoredBook): Promise<GateResult> {
   return gate(book, userId, token);
 }
 
-function gate(
+async function gate(
   book: StoredBook,
   userId: string | null,
   token: string | undefined
-): GateResult {
+): Promise<GateResult> {
   const hasValidToken = verifyAccessToken(token, book.id, Date.now(), book.passwordHash);
   const isOwner = Boolean(userId && userId === book.ownerId);
+  const role = book.ownerId ? await memberRole(book.ownerId, userId) : null;
   return {
-    decision: decideAccess(book, userId, hasValidToken),
+    decision: permits(role, "read") ? "ok" : decideAccess(book, userId, hasValidToken),
     isOwner,
-    canManage: isOwner,
+    canManage: permits(role, "edit"),
   };
 }

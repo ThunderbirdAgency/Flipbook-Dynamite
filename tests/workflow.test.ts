@@ -103,7 +103,7 @@ test("complete PDF lifecycle, ownership, private content, and failure recovery",
     assert.equal((await metadata(request("GET", undefined, cookie), protectedContext)).status, 200);
     await updateBook(protectedBook.id, { passwordHash: hashPassword("second-password") });
     assert.equal((await metadata(request("GET", undefined, cookie), protectedContext)).status, 401);
-    assert.equal((await (await library()).json()).books.length, 2);
+    assert.equal((await (await library(request())).json()).books.length, 2);
     assert.equal((await remove(request("DELETE"), context)).status, 200);
     assert.equal((await metadata(request(), context)).status, 404);
     assert.equal((await pdf(request(), context)).status, 404);
@@ -116,7 +116,7 @@ test("complete PDF lifecycle, ownership, private content, and failure recovery",
     await writeFile(path.join(dir, "books.json"), "corrupted index");
     await assert.rejects(listBooks("local-demo"));
     Object.assign(process.env, { NODE_ENV: "production", FLIPBOOK_LOCAL_DEMO: "true" });
-    assert.equal((await library()).status, 503);
+    assert.equal((await library(request())).status, 503);
     assert.equal((await create(request("POST", { fileName: "Listing.pdf", size: bytes.length }))).status, 503);
   } finally {
     for (const key of Object.keys(process.env)) if (!(key in before)) delete process.env[key];

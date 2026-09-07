@@ -8,7 +8,7 @@ import {
   savePdfBuffer,
   supabaseMode,
 } from "@/lib/store";
-import { currentUserId } from "@/lib/auth";
+import { hasPermission } from "@/lib/team";
 import { gateBookRequest } from "@/lib/gate";
 
 export const runtime = "nodejs";
@@ -77,8 +77,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const book = await getBook(id, true);
     if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
     {
-      const userId = await currentUserId();
-      if (!userId || book.ownerId !== userId) {
+      if (!await hasPermission(book.ownerId, "edit")) {
         return NextResponse.json({ error: "Not your book" }, { status: 403 });
       }
     }

@@ -7,7 +7,7 @@ import {
   saveAsset,
   updateBook,
 } from "@/lib/store";
-import { currentUserId } from "@/lib/auth";
+import { hasPermission } from "@/lib/team";
 import { mergeBranding } from "@/lib/branding";
 import { gateBookRequest } from "@/lib/gate";
 import { toPublicBook } from "@/lib/types";
@@ -45,8 +45,7 @@ function sniffImage(buf: Buffer): string | null {
 }
 
 async function canManage(ownerId?: string): Promise<boolean> {
-  const userId = await currentUserId();
-  return Boolean(userId && ownerId === userId);
+  return hasPermission(ownerId, "edit");
 }
 
 export async function GET(req: NextRequest, { params }: Params) {

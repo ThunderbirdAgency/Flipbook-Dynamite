@@ -5,13 +5,13 @@ import { nanoid } from "nanoid";
 import { createBook, getUploadTarget, listBooks, MAX_PDF_SIZE, enforceRateLimit } from "@/lib/store";
 import { StoredBook, Visibility, toPublicBook } from "@/lib/types";
 import { hashPassword } from "@/lib/access";
-import { requireUserId } from "@/lib/auth";
+import { activeWorkspace } from "@/lib/team";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(req:NextRequest) {
   return api(async () => {
-    const userId = await requireUserId();
+    const {ownerId:userId} = await activeWorkspace("read",req);
     const books = await listBooks(userId);
     return NextResponse.json({ books: books.map(toPublicBook) });
   });
@@ -26,7 +26,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   return api(async () => {
     assertSameOrigin(req);
-    const userId = await requireUserId();
+    const {ownerId:userId} = await activeWorkspace("edit",req);
     await enforceRateLimit(`create:${userId}`, 20);
     const body = await readJson(req);
     if (!body || typeof body.fileName !== "string" || !body.fileName) {
