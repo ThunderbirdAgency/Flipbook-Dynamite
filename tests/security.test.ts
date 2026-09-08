@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { configuration } from "../lib/config";
-import { parseBookInput, parseTitle, assertValidId, validatePdf, safeLink } from "../lib/validation";
-import { assertSameOrigin, readBoundedBody, readJson } from "../lib/http";
+import { parseBookInput, parseTitle, assertValidId, validatePdf, safeLink, parseViewingPassword } from "../lib/validation";
+import { assertSameOrigin, clientAddress, readBoundedBody, readJson } from "../lib/http";
 
 test("production and Vercel cannot fall back to an anonymous demo", () => {
   for (const env of [{ NODE_ENV: "production", FLIPBOOK_LOCAL_DEMO: "true" }, { NODE_ENV: "development", VERCEL: "1", FLIPBOOK_LOCAL_DEMO: "true" }, {}]) {
@@ -51,6 +51,26 @@ test("stream limits apply even when Content-Length is absent or false", async ()
   await assert.rejects(readBoundedBody(new Request("https://flip.example", { method: "POST", body: "123456789", headers: { "Content-Length": "1" } }), 5));
   await assert.rejects(readJson(new Request("https://flip.example", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{" })));
   await assert.rejects(readJson(new Request("https://flip.example", { method: "POST", body: "{}" })));
+});
+
+test("rate-limit address ignores caller-supplied forwarded hops", () => {
+  const at = (headers: Record<string, string>) =>
+    clientAddress(new Request("https://flip.example/api/books/x/unlock", { headers }));
+
+  // A spoofed leftmost entry must never become the bucket key.
+  assert.equal(at({ "x-forwarded-for": "1.1.1.1, 203.0.113.9" }), "203.0.113.9");
+  assert.equal(at({ "x-forwarded-for": "203.0.113.9" }), "203.0.113.9");
+  // Platform-attested headers win over the client-supplied chain.
+  assert.equal(at({ "x-forwarded-for": "1.1.1.1", "x-vercel-forwarded-for": "203.0.113.9" }), "203.0.113.9");
+  assert.equal(at({ "x-forwarded-for": "1.1.1.1", "x-real-ip": "203.0.113.9" }), "203.0.113.9");
+  assert.equal(at({}), "0.0.0.0");
+});
+
+test("viewing passwords must be long enough to survive an online guessing attack", () => {
+  for (const weak of ["", "1234", "spring2026", "password", "aaaaaaaaaaaaaaa", "123456789012", 42, null]) {
+    assert.throws(() => parseViewingPassword(weak));
+  }
+  assert.equal(parseViewingPassword("correct horse battery"), "correct horse battery");
 });
 
 test("creator and book pages reject cross-site framing without blocking embed pages", async () => {

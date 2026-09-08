@@ -247,6 +247,19 @@ function getCachedDoc(pdfUrl: string) {
   return p;
 }
 
+/**
+ * Drop a cached zoom document and free its buffers. Without this, every PDF
+ * opened through deep zoom stays parsed in this module-level map for the life of
+ * the tab — browsing several 100 MB books in one session would retain them all.
+ */
+export function releaseHiResDoc(pdfUrl: string) {
+  const pending = hiResDocCache.get(pdfUrl);
+  if (!pending) return;
+  hiResDocCache.delete(pdfUrl);
+  // The loading task owns the worker; destroying it frees the parsed document.
+  pending.then((doc) => doc.loadingTask.destroy()).catch(() => {});
+}
+
 export interface HiResPage {
   objectUrl: string;
   width: number;

@@ -1,4 +1,4 @@
-import { api, assertSameOrigin, readJson } from "@/lib/http";
+import { api, assertSameOrigin, clientAddress, readJson } from "@/lib/http";
 import { NextRequest, NextResponse } from "next/server";
 import { getBook, recordEvent, enforceRateLimit } from "@/lib/store";
 import { gateBookRequest } from "@/lib/gate";
@@ -35,14 +35,12 @@ export async function POST(req: NextRequest, { params }: Params) {
         ? Math.max(1, Math.min(100000, Math.floor(Number(body.page))))
         : undefined;
 
-    // Pseudonymous visitor id (keyed hash of IP + UA) used only to de-duplicate
-    // unique visits — we never store the raw IP or user agent.
-    const ip =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      req.headers.get("x-real-ip") ||
-      "0.0.0.0";
+    // Pseudonymous visitor id (keyed hash of address + UA) used only to
+    // de-duplicate unique visits — we never store the raw address or user agent.
+    // The address must come from a trusted hop, otherwise a caller can rotate
+    // the header to forge unlimited "unique" visitors in the owner's analytics.
     const ua = req.headers.get("user-agent") || "";
-    const visitor = visitorId(`${ip}|${ua}`);
+    const visitor = visitorId(`${clientAddress(req)}|${ua}`);
 
     await enforceRateLimit(`events:${id}:${visitor}`, 120);
     await recordEvent({

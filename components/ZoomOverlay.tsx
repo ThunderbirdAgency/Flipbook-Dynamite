@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { RenderedPage, renderPageHiRes } from "@/lib/pdf-client";
+import { RenderedPage, releaseHiResDoc, renderPageHiRes } from "@/lib/pdf-client";
 
 interface ZoomOverlayProps {
   pages: RenderedPage[];
@@ -45,11 +45,15 @@ export default function ZoomOverlay({ pages, startIndex, title, onClose, pdfUrl 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, pdfUrl]);
 
-  // Revoke every hi-res object URL when the overlay closes.
+  // Release every hi-res bitmap and the parsed document when the overlay closes,
+  // so reading several books in one session doesn't accumulate PDF buffers.
   useEffect(() => {
     const urls = urlsRef.current;
-    return () => urls.forEach((u) => URL.revokeObjectURL(u));
-  }, []);
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+      if (pdfUrl) releaseHiResDoc(pdfUrl);
+    };
+  }, [pdfUrl]);
 
   const page = pages[index];
 

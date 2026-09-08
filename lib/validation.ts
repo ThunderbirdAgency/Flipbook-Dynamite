@@ -33,6 +33,34 @@ export function validatePdf(prefix: Uint8Array, actualSize: number, expectedSize
   if (!new TextDecoder("latin1").decode(prefix.subarray(0, 1024)).includes("%PDF-")) throw new AppError(415, "The uploaded file is not a PDF");
 }
 
+export const MIN_PASSWORD_LENGTH = 12;
+const MAX_PASSWORD_LENGTH = 200;
+
+/**
+ * Viewing passwords protect a link that is handed out by design, so they are
+ * guessed online rather than cracked offline. Rate limiting alone can't save a
+ * password like "spring2026", so require real length and reject the degenerate
+ * shapes (one repeated character, a straight run of digits).
+ */
+export function parseViewingPassword(value: unknown): string {
+  if (typeof value !== "string") {
+    throw new AppError(400, "Enter a viewing password");
+  }
+  if (value.length < MIN_PASSWORD_LENGTH || value.length > MAX_PASSWORD_LENGTH) {
+    throw new AppError(
+      400,
+      `Use a viewing password between ${MIN_PASSWORD_LENGTH} and ${MAX_PASSWORD_LENGTH} characters`
+    );
+  }
+  if (new Set(value).size < 5 || /^\d+$/.test(value)) {
+    throw new AppError(
+      400,
+      "That password is too easy to guess. Mix in more different characters."
+    );
+  }
+  return value;
+}
+
 export function safeLink(url: string) {
   try { return ["https:", "http:", "mailto:", "tel:"].includes(new URL(url).protocol); }
   catch { return false; }

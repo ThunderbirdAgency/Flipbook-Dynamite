@@ -1,4 +1,4 @@
-import { api, assertSameOrigin, readJson } from "@/lib/http";
+import { api, assertSameOrigin, clientAddress, readJson } from "@/lib/http";
 import { NextRequest, NextResponse } from "next/server";
 import { getBook, enforceRateLimit } from "@/lib/store";
 import {
@@ -21,12 +21,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const book = await getBook(id);
     if (!book) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const ip =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      req.headers.get("x-real-ip") ||
-      "0.0.0.0";
-    await enforceRateLimit(`unlock:${id}:${visitorId(ip)}`, 8);
-    await enforceRateLimit(`unlock-book:${id}`, 100);
+    await enforceRateLimit(`unlock:${id}:${visitorId(clientAddress(req))}`, 8);
 
     if (!book.hasPassword || !book.passwordHash) {
       // Nothing to unlock — treat as success so the viewer proceeds.
@@ -36,6 +31,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     const body = await readJson(req);
     const password = body && typeof body.password === "string" ? body.password : "";
     if (password.length > 200 || !verifyPassword(password, book.passwordHash)) {
+      // The shared per-book budget is spent only by FAILED attempts. Charging it
+      // up front let anyone with the share link exhaust it and lock every
+      // legitimate viewer out; a correct password now always succeeds.
+      await enforceRateLimit(`unlock-book:${id}`, 100);
       return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
     }
 

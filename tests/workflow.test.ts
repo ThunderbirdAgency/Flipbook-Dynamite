@@ -70,7 +70,7 @@ test("complete PDF lifecycle, ownership, private content, and failure recovery",
     assert.equal(edited.overlays[0].url,"#2");
     assert.equal((await update(request("PATCH",{title:"   "}),context)).status,400);
     // A copy retains metadata, protection, overlays and independent assets/bytes.
-    await update(request("PATCH", {password:"copy-test", visibility:"private"}),context);
+    await update(request("PATCH", {password:"copy-test-passphrase", visibility:"private"}),context);
     const copiedResponse = await duplicate(request("POST"), context);
     assert.equal(copiedResponse.status,201);
     const copied = (await copiedResponse.json()).book;

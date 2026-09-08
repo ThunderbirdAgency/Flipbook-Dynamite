@@ -507,6 +507,30 @@ export async function saveAsset(
   return `/api/books/${id}/asset/${kind}?v=${Date.now()}`;
 }
 
+/**
+ * Delete an asset's stored bytes. Clearing only the branding field left the
+ * object retrievable at its stable URL, so a "removed" logo kept serving.
+ * Throws on failure so the caller can leave the metadata pointing at it and the
+ * owner can retry, rather than reporting a removal that did not happen.
+ */
+export async function deleteAsset(id: string, kind: string): Promise<void> {
+  requireConfiguration();
+  assertValidId(id);
+  assertValidKind(kind);
+  if (supabaseMode) {
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${ASSETS_BUCKET}`, {
+      method: "DELETE",
+      headers: sbHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ prefixes: [`${id}/${kind}`] }),
+    });
+    if (!res.ok) throw new Error("Could not delete the image; retry removal");
+    return;
+  }
+  await fs.unlink(path.join(ASSETS_DIR, `${id}-${kind}`)).catch((error) => {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  });
+}
+
 /** Read an asset's raw bytes (used to proxy assets of gated books). */
 export async function readAssetBytes(id: string, kind: string): Promise<Buffer | null> {
   requireConfiguration();

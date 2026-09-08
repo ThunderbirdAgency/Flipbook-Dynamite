@@ -1,6 +1,6 @@
 import { api, assertSameOrigin, readJson } from "@/lib/http";
 import { NextRequest, NextResponse } from "next/server";
-import { parseBookInput } from "@/lib/validation";
+import { parseBookInput, parseViewingPassword } from "@/lib/validation";
 import { nanoid } from "nanoid";
 import { createBook, getUploadTarget, listBooks, MAX_PDF_SIZE, enforceRateLimit } from "@/lib/store";
 import { StoredBook, Visibility, toPublicBook } from "@/lib/types";
@@ -44,10 +44,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Only PDF files are supported" }, { status: 415 });
     }
 
-    const visibility: Visibility = body.visibility === "private" ? "private" : "public";
+    // Private by default: a new upload only becomes link-public when the caller
+    // explicitly asks for it. The UI promises uploads start private, and a
+    // confidential PDF must never be exposed by an omitted field.
+    const visibility: Visibility = body.visibility === "public" ? "public" : "private";
     const password =
       typeof body.password === "string" && body.password.length > 0
-        ? body.password.slice(0, 200)
+        ? parseViewingPassword(body.password)
         : null;
 
     const book: StoredBook = {

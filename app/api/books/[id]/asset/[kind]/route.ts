@@ -1,6 +1,7 @@
 import { api, assertSameOrigin, readBoundedBody } from "@/lib/http";
 import { NextRequest, NextResponse } from "next/server";
 import {
+  deleteAsset,
   getBook,
   enforceRateLimit,
   readAssetBytes,
@@ -117,6 +118,10 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Not your book" }, { status: 403 });
     }
 
+    // Remove the bytes before clearing the reference: if storage deletion fails
+    // the branding still points at the image and the owner can retry, instead of
+    // the image silently remaining fetchable at its stable URL.
+    await deleteAsset(id, kind);
     const branding = mergeBranding(book.branding ?? {}, { [field]: null });
     const updated = await updateBook(id, { branding });
     return NextResponse.json({ book: updated ? toPublicBook(updated) : null });

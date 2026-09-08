@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { deleteBook, getBook, updateBook, enforceRateLimit, type BookPatch } from "@/lib/store";
 import { hasPermission } from "@/lib/team";
 import { hashPassword } from "@/lib/access";
-import { parseTitle } from "@/lib/validation";
+import { parseTitle, parseViewingPassword } from "@/lib/validation";
 import { mergeBranding } from "@/lib/branding";
 import { sanitizeOverlays } from "@/lib/overlays";
 import { gateBookRequest } from "@/lib/gate";
@@ -66,7 +66,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (body.password === null || body.password === "") {
       patch.passwordHash = null;
     } else if (typeof body.password === "string") {
-      patch.passwordHash = hashPassword(body.password.slice(0, 200));
+      patch.passwordHash = hashPassword(parseViewingPassword(body.password));
     }
     if (body.branding && typeof body.branding === "object") {
       patch.branding = mergeBranding(book.branding ?? {}, body.branding);

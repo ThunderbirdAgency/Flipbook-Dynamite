@@ -20,6 +20,32 @@ export function assertSameOrigin(req: Request) {
   }
 }
 
+/**
+ * Client address used for rate-limit buckets and visitor de-duplication.
+ *
+ * `X-Forwarded-For` is a client-supplied chain: every proxy APPENDS, so the
+ * leftmost entry is whatever the caller sent and must never be trusted — using
+ * it lets an attacker mint a fresh rate-limit bucket per request. We therefore
+ * prefer a header the platform attests (Vercel rewrites both of these), and
+ * otherwise take the RIGHTMOST hop, which the nearest trusted proxy appended.
+ * Set FLIPBOOK_TRUSTED_PROXIES to the number of proxies in front of the app to
+ * pick the correct entry when you run behind more than one.
+ */
+export function clientAddress(req: Request): string {
+  const attested = req.headers.get("x-vercel-forwarded-for") || req.headers.get("x-real-ip");
+  if (attested?.trim()) return attested.trim();
+
+  const hops = (req.headers.get("x-forwarded-for") || "")
+    .split(",")
+    .map((hop) => hop.trim())
+    .filter(Boolean);
+  if (!hops.length) return "0.0.0.0";
+
+  const trusted = Number(process.env.FLIPBOOK_TRUSTED_PROXIES);
+  const back = Number.isInteger(trusted) && trusted > 0 ? trusted : 1;
+  return hops[Math.max(0, hops.length - back)];
+}
+
 export async function readBoundedBody(req: Request, limit: number) {
   if (Number(req.headers.get("content-length")) > limit) throw new AppError(413, "Request is too large");
   const reader = req.body?.getReader();
