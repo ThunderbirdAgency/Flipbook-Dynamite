@@ -1,14 +1,18 @@
 # Flipbook Dynamite — current release handoff
 
-Updated 2026-09-05. This document replaces the outdated July setup instructions.
+Updated 2026-09-11. This document replaces the outdated July setup instructions.
 
 ## Source of truth
 
 - Repository: `ThunderbirdAgency/Flipbook-Dynamite`
-- Latest existing work: `claude/flipping-book-business-jeru1f`, commit `d592ffb`
 - Release candidate: `release/flipbook-current`
-- The default `claude/pdf-flipping-book-app-sukfbi` branch is older. Do not deploy
-  it accidentally or overwrite the newer marketing, branding, overlay, and zoom work.
+- `claude/pdf-flipping-book-app-sukfbi` is the branch Vercel deploys to production:
+  a push to it deploys straight to `flipbookdynamite.com` with no manual promote.
+  As of 2026-09-11 it is no longer behind — PR #3 merged `release/flipbook-current`
+  into it (merge commit `88b4c7f`), so it now carries the marketing, branding,
+  overlay and zoom work rather than the older tree the July notes warned about.
+- `claude/flipping-book-business-jeru1f` (commit `d592ffb`) is superseded; its work
+  reached production through the same merge, which auto-closed PR #2.
 - Intended host: Vercel. This repository has not been converted to another host.
 - Supabase project: `flipbook-dynamite`, ref `tujhvzaxwjgzupqzmakx`, us-east-2.
 
@@ -32,8 +36,10 @@ Authenticated Vercel inspection confirmed the existing project:
 
 - Team: `thunderbird-agency`; account: `emiller-4447`.
 - Project ID: `prj_gIE6JB755AmBTm5XgJFuH8b3MAJ1`; Node.js 24.x; root directory `.`.
-- Production still uses `claude/pdf-flipping-book-app-sukfbi`. Do not change traffic
-  until the candidate is configured and verified.
+- Production serves from `claude/pdf-flipping-book-app-sukfbi`. Verified 2026-09-11
+  by merging into it and observing an automatic `target: production` deployment
+  alias onto `flipbookdynamite.com` and `www.flipbookdynamite.com`. Treat any push
+  to that branch as a live release.
 - Candidate preview alias:
   `https://flipbook-dynamite-git-release-flipboo-06762b-thunderbird-agency.vercel.app`.
 - Initially no application environment variables or integration resources existed.
@@ -89,8 +95,10 @@ The database permission checks and 12 regression/lifecycle/schema tests passed.
 1. Use the existing linked Vercel project identified above. The connected app's empty
    project list was misleading; authenticated CLI inspection works. Do not create a
    duplicate project.
-2. Preview keys are configured; production Clerk and Supabase credentials remain to
-   be configured before launch. Keep development Clerk keys out of production.
+2. Production credentials are configured. Verified 2026-09-11 against the live site:
+   `/api/books` answers 401 rather than the 503 the fail-closed config returns when
+   Clerk or Supabase is missing, and the production bundle ships a `pk_live_` Clerk
+   key on `clerk.flipbookdynamite.com`. Keep development Clerk keys out of production.
 3. Both prepared database changes are applied and tested. Preserve live user data.
 4. Deploy the creator portal candidate with private folders, list/grid views, search,
    sorting, CSV export, per-book views, rename, branding, sharing/privacy, and analytics.
