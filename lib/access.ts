@@ -45,6 +45,33 @@ export function accessCookieName(bookId: string): string {
   return `fb_acc_${bookId}`;
 }
 
+/**
+ * Cookie attributes for an access grant.
+ *
+ * A book embedded in an <iframe> on another site lives in a third-party cookie
+ * jar, where a SameSite=Lax grant is never sent back — the viewer unlocks and is
+ * immediately prompted again. SameSite=None fixes that, but browsers only honour
+ * None alongside Secure, so an insecure context stays on Lax rather than
+ * emitting a cookie the browser would silently reject.
+ *
+ * Relaxing to None is deliberate and narrow: this cookie is httpOnly, scoped to
+ * one book id, and grants read access only — every mutating endpoint requires a
+ * signed-in identity and a same-origin check, so it carries nothing a cross-site
+ * request could abuse.
+ *
+ * Caveat: browsers that block third-party cookies outright (Safari by default)
+ * will still drop it. Those viewers can open the book via its direct link.
+ */
+export function accessCookieOptions(embed: boolean, secure: boolean) {
+  return {
+    httpOnly: true,
+    sameSite: embed && secure ? ("none" as const) : ("lax" as const),
+    secure,
+    path: "/",
+    maxAge: ACCESS_TTL_SECONDS,
+  };
+}
+
 function sign(payload: string): string {
   return createHmac("sha256", SECRET).update(payload).digest("base64url");
 }

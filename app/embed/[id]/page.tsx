@@ -36,7 +36,7 @@ export default async function EmbedPage({ params, searchParams }: Props) {
           overlays={book.overlays ?? []}
         />
       ) : decision === "needs-password" ? (
-        <UnlockGate id={book.id} title="Protected flipbook" />
+        <UnlockGate id={book.id} title="Protected flipbook" embed />
       ) : (
         <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-slate-400">
           This flipbook is private.

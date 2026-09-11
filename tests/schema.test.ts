@@ -21,7 +21,7 @@ test("PostgreSQL migration preserves books, denies direct anonymous access, and 
       insert into public.flipbook_books (id,title,file_name,size,created_at,owner_id) values ('legacybook1', 'Existing book', 'book.pdf', 123, now(), 'original-owner');
       insert into storage.objects values ('ours', 'flipbook-pdfs'), ('asset', 'flipbook-assets'), ('other', 'unrelated-bucket');
     `);
-    const migration = await readFile(new URL("./fixtures/readiness-schema.sql", import.meta.url), "utf8");
+    const migration = await readFile(new URL("../supabase/migrations/20260908000100_release_readiness.sql", import.meta.url), "utf8");
     await db.exec(migration);
     await db.exec(migration); // safe to reapply the prepared migration
     assert.deepEqual((await db.query("select title, status from public.flipbook_books where id='legacybook1'")).rows, [{ title: "Existing book", status: "ready" }]);
@@ -67,8 +67,8 @@ test("PostgreSQL migration preserves books, denies direct anonymous access, and 
     await db.query("update public.flipbook_books set status='deleted' where owner_id='quota-user'");
     await assert.rejects(db.query("select public.flipbook_reserve_upload('tombstone00','Book','book.pdf',1,'quota-user')"), /library_limit/);
     await db.exec("reset role");
-    await db.exec(await readFile(new URL("./fixtures/workspace-schema.sql", import.meta.url), "utf8"));
-    await db.exec(await readFile(new URL("./fixtures/capacity-schema.sql", import.meta.url), "utf8"));
+    await db.exec(await readFile(new URL("../supabase/migrations/20260908000200_workspace_folders.sql", import.meta.url), "utf8"));
+    await db.exec(await readFile(new URL("../supabase/migrations/20260908000300_account_capacity.sql", import.meta.url), "utf8"));
     for (const role of ["anon", "authenticated"]) {
       await db.exec("set role " + role);
       await assert.rejects(db.query("select * from public.flipbook_account_limits"));

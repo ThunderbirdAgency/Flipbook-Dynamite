@@ -73,13 +73,74 @@ test("viewing passwords must be long enough to survive an online guessing attack
   assert.equal(parseViewingPassword("correct horse battery"), "correct horse battery");
 });
 
+test("embedded viewers get a grant that survives a third-party cookie jar", async () => {
+  const { accessCookieOptions } = await import("../lib/access");
+
+  // Direct viewers keep the stricter default.
+  assert.equal(accessCookieOptions(false, true).sameSite, "lax");
+  assert.equal(accessCookieOptions(false, false).sameSite, "lax");
+
+  // An embed on someone else's site needs None, which requires Secure.
+  const embedded = accessCookieOptions(true, true);
+  assert.equal(embedded.sameSite, "none");
+  assert.equal(embedded.secure, true);
+
+  // Never emit None without Secure — browsers reject that outright, which would
+  // silently drop the grant instead of merely restricting it.
+  assert.equal(accessCookieOptions(true, false).sameSite, "lax");
+
+  // The grant must never become readable to embedding page scripts.
+  assert.equal(embedded.httpOnly, true);
+});
+
+test("every route carries transport security and a script-origin policy", async () => {
+  const { default: config } = await import("../next.config");
+  const rules = await config.headers!();
+  const baseline = rules.find(r => r.source === "/:path*")!;
+  const header = (key: string) => baseline.headers.find(h => h.key === key)?.value ?? "";
+
+  const hsts = header("Strict-Transport-Security");
+  assert.match(hsts, /max-age=\d+/);
+  assert.ok(Number(hsts.match(/max-age=(\d+)/)![1]) >= 31536000, "HSTS must last at least a year");
+  assert.ok(hsts.includes("includeSubDomains"));
+
+  const csp = header("Content-Security-Policy");
+  // Scripts must be pinned to known origins, and plugin/base-tag injection shut.
+  assert.ok(csp.includes("script-src 'self'"));
+  assert.ok(csp.includes("object-src 'none'"));
+  assert.ok(csp.includes("base-uri 'self'"));
+  assert.ok(csp.includes("form-action 'self'"));
+  // Every script source must be a keyword or a concrete origin — a bare `https:`
+  // or `*` would let any host serve script and defeat pinning entirely.
+  const scriptSrc = csp.match(/script-src ([^;]*)/)![1].split(/\s+/).filter(Boolean);
+  for (const source of scriptSrc) {
+    assert.ok(
+      source.startsWith("'") || source.startsWith("https://"),
+      `script-src source ${source} must be a keyword or a concrete https:// origin`
+    );
+  }
+  // pdf.js renders into blob: URLs and runs a blob: worker; overlays embed
+  // third-party players. Locking these down would break the product.
+  assert.ok(csp.includes("worker-src 'self' blob:"));
+  assert.ok(/img-src[^;]*blob:/.test(csp));
+
+  // The baseline must stay frame-able so /embed keeps working on customer sites.
+  assert.equal(csp.includes("frame-ancestors"), false);
+});
+
 test("creator and book pages reject cross-site framing without blocking embed pages", async () => {
   const { default: config } = await import("../next.config");
   const rules = await config.headers!();
   for (const route of ["/app/:path*", "/book/:path*", "/sign-in/:path*", "/sign-up/:path*"]) {
     const rule = rules.find(r => r.source === route && r.headers.some(h => h.key === "X-Frame-Options"));
     assert.ok(rule, `${route} must have anti-framing headers`);
-    assert.ok(rule.headers.some(h => h.key === "Content-Security-Policy" && h.value.includes("frame-ancestors 'self'")));
+    const csp = rule.headers.find(h => h.key === "Content-Security-Policy")!.value;
+    assert.ok(csp.includes("frame-ancestors 'self'"));
+    // Next REPLACES a header when two rules set the same key, so a route-specific
+    // policy that only says frame-ancestors silently DROPS the baseline for that
+    // route — leaving the creator pages less protected than public ones.
+    assert.ok(csp.includes("script-src 'self'"), `${route} must restate the baseline script-src`);
+    assert.ok(csp.includes("object-src 'none'"), `${route} must restate the baseline object-src`);
   }
   assert.equal(rules.some(r => r.source.startsWith("/embed") && r.headers.some(h => h.key === "X-Frame-Options")), false);
 });

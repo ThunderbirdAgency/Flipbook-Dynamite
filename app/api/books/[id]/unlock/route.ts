@@ -2,8 +2,8 @@ import { api, assertSameOrigin, clientAddress, readJson } from "@/lib/http";
 import { NextRequest, NextResponse } from "next/server";
 import { getBook, enforceRateLimit } from "@/lib/store";
 import {
-  ACCESS_TTL_SECONDS,
   accessCookieName,
+  accessCookieOptions,
   mintAccessToken,
   verifyPassword,
   visitorId,
@@ -39,13 +39,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const res = NextResponse.json({ ok: true });
-    res.cookies.set(accessCookieName(id), mintAccessToken(id, Date.now(), book.passwordHash), {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: ACCESS_TTL_SECONDS,
-  });
-  return res;
+    res.cookies.set(
+      accessCookieName(id),
+      mintAccessToken(id, Date.now(), book.passwordHash),
+      accessCookieOptions(body?.embed === true, process.env.NODE_ENV === "production")
+    );
+    return res;
   });
 }

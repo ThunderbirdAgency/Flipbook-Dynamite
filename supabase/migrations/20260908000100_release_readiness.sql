@@ -1,5 +1,8 @@
--- Draft deployment SQL, validated in tests. Generate the migration with
--- `supabase migration new release_readiness` before deployment.
+-- Core schema: books, upload reservations, analytics and rate limiting.
+--
+-- Apply with `supabase db push`. The test suite executes this exact file against
+-- an in-process Postgres, so the authorization rules verified in CI are the ones
+-- that ship — there is no second, hand-maintained copy to drift from it.
 begin;
 
 -- This migration is scoped to Flipbook Dynamite. It preserves existing books.
@@ -26,6 +29,23 @@ create index if not exists flipbook_books_owner_created_idx on public.flipbook_b
 alter table public.flipbook_books enable row level security;
 revoke all on public.flipbook_books from anon, authenticated;
 grant all on public.flipbook_books to service_role;
+
+-- Analytics events. This table predates the migration set and existed only
+-- because it had been created by hand, so a database rebuilt purely from these
+-- files came back without it and every stats query failed. Created here with the
+-- same lockdown as the rest: readers go through flipbook_get_stats, never the
+-- raw rows, which carry per-visitor reading history.
+create table if not exists public.flipbook_events (
+  book_id text not null,
+  type text not null,
+  page integer,
+  visitor text,
+  created_at timestamptz not null default now()
+);
+create index if not exists flipbook_events_book_idx on public.flipbook_events (book_id, type);
+alter table public.flipbook_events enable row level security;
+revoke all on public.flipbook_events from anon, authenticated;
+grant all on public.flipbook_events to service_role;
 
 -- Remove policies only from this app's metadata table. Service role bypasses RLS.
 do $$ declare p record;
