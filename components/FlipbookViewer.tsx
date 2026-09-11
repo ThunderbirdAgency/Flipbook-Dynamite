@@ -3,11 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PageFlip } from "page-flip";
 import { renderPdfToPages, OutlineItem, RenderedPage } from "@/lib/pdf-client";
-import { playFlipSound } from "@/lib/flip-sound";
+import { FLIP_DURATION_MS, playFlipSound, stopFlipSound, prepareFlipSound } from "@/lib/flip-sound";
 import ShareDialog from "@/components/ShareDialog";
+import BrandingDialog from "@/components/BrandingDialog";
 import ZoomOverlay from "@/components/ZoomOverlay";
 import ThumbnailStrip from "@/components/ThumbnailStrip";
 import TocPanel from "@/components/TocPanel";
+import SearchPanel from "@/components/SearchPanel";
+
+import type { Branding, Overlay, Visibility } from "@/lib/types";
+import { OverlayItem, OverlayLightbox } from "@/components/OverlayLayer";
+import OverlayEditor from "@/components/OverlayEditor";
 
 interface FlipbookViewerProps {
   pdfUrl: string;
@@ -15,6 +21,16 @@ interface FlipbookViewerProps {
   downloadUrl?: string;
   shareUrl?: string;
   embedUrl?: string;
+  /** Book id — enables view/engagement analytics beacons when present. */
+  bookId?: string;
+  /** True when the current viewer owns the book (unlocks privacy + insights). */
+  isOwner?: boolean;
+  visibility?: Visibility;
+  hasPassword?: boolean;
+  /** Per-book branding: background, logo, accent, download toggle. */
+  branding?: Branding;
+  /** Interactive overlays placed on pages. */
+  overlays?: Overlay[];
 }
 
 type Status = "loading" | "ready" | "error";
@@ -27,9 +43,29 @@ export default function FlipbookViewer({
   downloadUrl,
   shareUrl,
   embedUrl,
+  bookId,
+  isOwner,
+  visibility = "public",
+  hasPassword = false,
+  branding = {},
+  overlays = [],
 }: FlipbookViewerProps) {
+  // Held in state so the owner's branding edits reflect live in the viewer.
+  const [brand, setBrand] = useState<Branding>(branding);
+  const [brandOpen, setBrandOpen] = useState(false);
+  const [overlayList, setOverlayList] = useState<Overlay[]>(overlays);
+  const [editOpen, setEditOpen] = useState(()=>isOwner && typeof window!=="undefined" && new URLSearchParams(location.search).get("edit")==="1");
+  const [lightbox, setLightbox] = useState<Overlay | null>(null);
+  const accent = brand.accent || "#fbbf24";
+  const showDownload = brand.allowDownload !== false && Boolean(downloadUrl);
+  const customBg = brand.bgImageUrl
+    ? `center / cover no-repeat url("${brand.bgImageUrl}")`
+    : brand.bgColor || null;
   const [pages, setPages] = useState<RenderedPage[] | null>(null);
-  const [outline, setOutline] = useState<OutlineItem[]>([]);
+  const [pdfOutline, setOutline] = useState<OutlineItem[]>([]);
+  const outline = brand.toc?.length ? brand.toc : pdfOutline;
+  const [pageTexts, setPageTexts] = useState<string[]>([]);
+  const [showSearch, setShowSearch] = useState(false);
   const [status, setStatus] = useState<Status>("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -37,13 +73,15 @@ export default function FlipbookViewer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
-  const [showThumbs, setShowThumbs] = useState(false);
+  const [showThumbs, setShowThumbs] = useState(branding.showThumbnails === true);
   const [showToc, setShowToc] = useState(false);
   const [autoplay, setAutoplay] = useState(false);
   const [muted, setMuted] = useState(
-    () => typeof window !== "undefined" && localStorage.getItem("fbd-muted") === "1"
+    () => {
+      const preference = typeof window !== "undefined" ? localStorage.getItem("fbd-muted") : null;
+      return preference === null ? branding.pageSound === false : preference === "1";
+    }
   );
-
   const containerRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<HTMLDivElement>(null);
   const flipRef = useRef<PageFlip | null>(null);
@@ -51,7 +89,45 @@ export default function FlipbookViewer({
   const mutedRef = useRef(muted);
   useEffect(() => {
     mutedRef.current = muted;
+    if (muted) stopFlipSound();
   }, [muted]);
+
+  // Owner can flip privacy from the share dialog; keep a live copy for the UI.
+  const [bookVisibility, setBookVisibility] = useState<Visibility>(visibility);
+  const [bookHasPassword, setBookHasPassword] = useState(hasPassword);
+
+  // Analytics: fire-and-forget beacons for "book opened" and "page reached".
+  const reportedPages = useRef<Set<number>>(new Set());
+  const reportEvent = useCallback(
+    (type: "view" | "page", page?: number) => {
+      if (!bookId) return;
+      if (type === "page" && page != null) {
+        if (reportedPages.current.has(page)) return;
+        reportedPages.current.add(page);
+      }
+      const url = `/api/books/${bookId}/events`;
+      const payload = JSON.stringify({ type, page, track: new URLSearchParams(location.search).get("track") });
+      try {
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(url, new Blob([payload], { type: "application/json" }));
+          return;
+        }
+      } catch {
+        // fall through to fetch
+      }
+      fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+        keepalive: true,
+      }).catch(() => {});
+    },
+    [bookId]
+  );
+  const reportEventRef = useRef(reportEvent);
+  useEffect(() => {
+    reportEventRef.current = reportEvent;
+  }, [reportEvent]);
 
   // Phase 1: rasterize the PDF into page images + link maps + outline.
   useEffect(() => {
@@ -65,6 +141,7 @@ export default function FlipbookViewer({
         if (result.pages.length === 0) throw new Error("The PDF has no pages.");
         setPages(result.pages);
         setOutline(result.outline);
+        setPageTexts(result.pageTexts);
         setStatus("ready");
       })
       .catch((err) => {
@@ -99,27 +176,40 @@ export default function FlipbookViewer({
         maxWidth: 3000,
         minHeight: 220,
         maxHeight: 3000,
-        showCover: true,
+        showCover: brand.showCover !== false,
+        // Let PageFlip adapt to its available width without destroying the DOM.
         usePortrait: true,
         autoSize: true,
-        maxShadowOpacity: 0.4,
+        // Keep the turn and paper sound on the same timing.
+        drawShadow: true,
+        maxShadowOpacity: brand.shadow ?? 0.4,
         mobileScrollSupport: false,
         clickEventForward: true,
         showPageCorners: true,
-        flippingTime: 650,
+        flippingTime: FLIP_DURATION_MS,
       });
       flip.loadFromHTML(bookRef.current.querySelectorAll(".fb-page"));
-      flip.on("flip", (e) => setCurrent(e.data as number));
-      flip.on("changeState", (e) => {
-        // "flipping" fires when a page-turn animation starts.
-        if (e.data === "flipping" && !mutedRef.current) playFlipSound();
+      flip.on("flip", (e) => {
+        const index = e.data as number;
+        setCurrent(index);
+        reportEventRef.current("page", index + 1);
       });
+      let previousState: unknown = "read";
+      flip.on("changeState", (e) => {
+        if (e.data === "flipping" && previousState !== "flipping" && !mutedRef.current) {
+          playFlipSound();
+        }
+        previousState = e.data;
+      });
+      const requestedPage=Number(new URLSearchParams(location.search).get('page'));
+      if(Number.isInteger(requestedPage)&&requestedPage>0&&requestedPage<=pages.length) flip.turnToPage(requestedPage-1);
       flipRef.current = flip;
       setCurrent(flip.getCurrentPageIndex());
     })();
 
     return () => {
       disposed = true;
+      stopFlipSound();
       flipRef.current = null;
       try {
         flip?.destroy();
@@ -127,7 +217,7 @@ export default function FlipbookViewer({
         // PageFlip.destroy throws if it never finished mounting; safe to ignore.
       }
     };
-  }, [pages]);
+  }, [pages, brand.showCover, brand.shadow]);
 
   // Keyboard navigation.
   useEffect(() => {
@@ -140,6 +230,13 @@ export default function FlipbookViewer({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [zoomOpen]);
+
+  // Count one view when the book finishes loading, and the opening page.
+  useEffect(() => {
+    if (status !== "ready") return;
+    reportEventRef.current("view");
+    reportEventRef.current("page", 1);
+  }, [status]);
 
   // Track fullscreen state.
   useEffect(() => {
@@ -186,11 +283,16 @@ export default function FlipbookViewer({
   return (
     <div
       ref={containerRef}
+      onPointerDownCapture={() => { if (!mutedRef.current) prepareFlipSound(); }}
+      onKeyDownCapture={() => { if (!mutedRef.current) prepareFlipSound(); }}
       className="relative flex h-full w-full flex-col overflow-hidden bg-slate-950"
+      style={{ ["--fb-accent" as string]: accent } as React.CSSProperties}
     >
       {/* Stage */}
       <div
-        className={`relative flex-1 overflow-hidden px-4 pt-4 pb-20 sm:px-10 ${showThumbs ? "pl-36 sm:pl-44" : ""} ${showToc ? "pr-72" : ""}`}
+        className={`flipbook-env relative flex-1 overflow-hidden px-4 pt-4 pb-20 sm:px-10 ${showThumbs ? "pl-36 sm:pl-44" : ""} ${showToc || showSearch ? "pr-80" : ""}`}
+        data-bg={customBg ? "custom" : undefined}
+        style={customBg ? ({ ["--fb-bg" as string]: customBg } as React.CSSProperties) : undefined}
       >
         {status === "loading" && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 text-slate-300">
@@ -219,7 +321,8 @@ export default function FlipbookViewer({
         )}
 
         {pages && (
-          <div className="mx-auto flex h-full max-w-6xl items-center justify-center">
+          <div className="flipbook-book relative mx-auto flex h-full max-w-6xl items-center justify-center">
+            <div className="flipbook-shadow" aria-hidden="true" />
             <div ref={bookRef} className="flipbook-stage w-full">
               {pages.map((page, i) => (
                 <div
@@ -276,6 +379,16 @@ export default function FlipbookViewer({
                       />
                     )
                   )}
+                  {overlayList
+                    .filter((o) => o.page === i + 1)
+                    .map((o) => (
+                      <OverlayItem
+                        key={o.id}
+                        overlay={o}
+                        onJump={goToPage}
+                        onOpen={setLightbox}
+                      />
+                    ))}
                 </div>
               ))}
             </div>
@@ -297,27 +410,47 @@ export default function FlipbookViewer({
           onClose={() => setShowToc(false)}
         />
       )}
+      {status === "ready" && showSearch && (
+        <SearchPanel
+          pageTexts={pageTexts}
+          onSelect={(p) => goToPage(p)}
+          onClose={() => setShowSearch(false)}
+        />
+      )}
 
       {/* Toolbar */}
       {status === "ready" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center pb-4">
           <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-1 rounded-full border border-slate-700/60 bg-slate-900/90 px-3 py-2 shadow-xl backdrop-blur">
-            <ToolbarButton
+            {brand.allowThumbnails !== false && <ToolbarButton
               label="Thumbnails"
               active={showThumbs}
               onClick={() => setShowThumbs((v) => !v)}
             >
               <ThumbsIcon />
-            </ToolbarButton>
-            {outline.length > 0 && (
+            </ToolbarButton>}
+            {brand.allowToc !== false && outline.length > 0 && (
               <ToolbarButton
                 label="Table of contents"
                 active={showToc}
-                onClick={() => setShowToc((v) => !v)}
+                onClick={() => {
+                  setShowSearch(false);
+                  setShowToc((v) => !v);
+                }}
               >
                 <TocIcon />
               </ToolbarButton>
             )}
+            {brand.allowSearch !== false && <ToolbarButton
+              label="Search inside"
+              active={showSearch}
+              onClick={() => {
+                setShowToc(false);
+                setShowSearch((v) => !v);
+              }}
+            >
+              <SearchIcon />
+            </ToolbarButton>}
 
             <div className="mx-1 h-5 w-px bg-slate-700" />
 
@@ -339,16 +472,16 @@ export default function FlipbookViewer({
 
             <div className="mx-1 h-5 w-px bg-slate-700" />
 
-            <ToolbarButton
+            {brand.allowAutoplay !== false && <ToolbarButton
               label={autoplay ? "Stop autoplay" : "Autoplay"}
               active={autoplay}
               onClick={() => setAutoplay((v) => !v)}
             >
               {autoplay ? <PauseIcon /> : <PlayIcon />}
-            </ToolbarButton>
-            <ToolbarButton label="Zoom" onClick={() => setZoomOpen(true)}>
+            </ToolbarButton>}
+            {brand.allowZoom !== false && <ToolbarButton label="Zoom" onClick={() => setZoomOpen(true)}>
               <ZoomIcon />
-            </ToolbarButton>
+            </ToolbarButton>}
             <ToolbarButton
               label={muted ? "Unmute page-flip sound" : "Mute page-flip sound"}
               onClick={toggleMuted}
@@ -358,12 +491,32 @@ export default function FlipbookViewer({
 
             <div className="mx-1 h-5 w-px bg-slate-700" />
 
-            {shareUrl && (
+            {brand.allowShare !== false && shareUrl && (
               <ToolbarButton label="Share" onClick={() => setShareOpen(true)}>
                 <ShareIcon />
               </ToolbarButton>
             )}
-            {downloadUrl && (
+            {isOwner && bookId && (
+              <ToolbarButton label="Add video / links / layers" onClick={() => setEditOpen(true)}>
+                <LayersIcon />
+              </ToolbarButton>
+            )}
+            {isOwner && bookId && (
+              <ToolbarButton label="Customize / branding" onClick={() => setBrandOpen(true)}>
+                <BrushIcon />
+              </ToolbarButton>
+            )}
+            {isOwner && bookId && (
+              <a
+                href={`/book/${bookId}/insights`}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-700/70 hover:text-white"
+                title="Insights"
+                aria-label="View insights"
+              >
+                <InsightsIcon />
+              </a>
+            )}
+            {showDownload && (
               <a
                 href={downloadUrl}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-700/70 hover:text-white"
@@ -373,13 +526,42 @@ export default function FlipbookViewer({
                 <DownloadIcon />
               </a>
             )}
-            <ToolbarButton
+            {brand.allowFullscreen !== false && <ToolbarButton
               label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               onClick={toggleFullscreen}
             >
               <FullscreenIcon exit={isFullscreen} />
-            </ToolbarButton>
+            </ToolbarButton>}
           </div>
+        </div>
+      )}
+
+      {brand.ctaUrl && brand.ctaLabel && <a href={brand.ctaUrl} target="_blank" rel="noopener noreferrer" className="absolute right-5 top-5 z-20 rounded-xl px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg" style={{backgroundColor:accent}}>{brand.ctaLabel}</a>}
+      {/* Custom logo, bottom-left (branding) */}
+      {brand.logoUrl && (
+        <div className="pointer-events-none absolute bottom-4 left-4 z-20">
+          {brand.logoLink ? (
+            <a
+              href={brand.logoLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pointer-events-auto block"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={brand.logoUrl}
+                alt="Logo"
+                className="h-9 w-auto max-w-[170px] object-contain drop-shadow-lg sm:h-11"
+              />
+            </a>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={brand.logoUrl}
+              alt="Logo"
+              className="h-9 w-auto max-w-[170px] object-contain drop-shadow-lg sm:h-11"
+            />
+          )}
         </div>
       )}
 
@@ -390,14 +572,48 @@ export default function FlipbookViewer({
           title={title}
           shareUrl={shareUrl}
           embedUrl={embedUrl}
+          bookId={bookId}
+          isOwner={isOwner}
+          visibility={bookVisibility}
+          hasPassword={bookHasPassword}
+          onPrivacyChange={(v, hp) => {
+            setBookVisibility(v);
+            setBookHasPassword(hp);
+          }}
         />
       )}
+
+      {isOwner && bookId && (
+        <BrandingDialog
+          open={brandOpen}
+          onClose={() => setBrandOpen(false)}
+          bookId={bookId}
+          branding={brand}
+          onChange={setBrand}
+        />
+      )}
+
+      {isOwner && bookId && editOpen && pages && (
+        <OverlayEditor
+          title={title}
+          branding={brand}
+          onMetadataChange={setBrand}
+          bookId={bookId}
+          pages={pages}
+          overlays={overlayList}
+          onChange={setOverlayList}
+          onClose={() => setEditOpen(false)}
+        />
+      )}
+
+      {lightbox && <OverlayLightbox overlay={lightbox} onClose={() => setLightbox(null)} />}
 
       {zoomOpen && pages && (
         <ZoomOverlay
           pages={pages}
           startIndex={Math.min(current, pages.length - 1)}
           title={title}
+          pdfUrl={pdfUrl}
           onClose={() => setZoomOpen(false)}
         />
       )}
@@ -471,9 +687,10 @@ function ToolbarButton({
       onClick={onClick}
       className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
         active
-          ? "bg-amber-400 text-slate-950 hover:bg-amber-300"
+          ? "text-slate-950"
           : "text-slate-300 hover:bg-slate-700/70 hover:text-white"
       }`}
+      style={active ? { background: "var(--fb-accent, #fbbf24)" } : undefined}
       title={label}
       aria-label={label}
     >
@@ -566,6 +783,44 @@ function SoundIcon({ muted }: { muted: boolean }) {
           <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
         </>
       )}
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function LayersIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+      <polyline points="2 17 12 22 22 17" />
+      <polyline points="2 12 12 17 22 12" />
+    </svg>
+  );
+}
+
+function BrushIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08" />
+      <path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z" />
+    </svg>
+  );
+}
+
+function InsightsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
     </svg>
   );
 }

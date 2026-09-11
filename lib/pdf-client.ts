@@ -1,3 +1,4 @@
+import { safeLink } from "./validation";
 // Client-side PDF rendering helpers built on pdf.js. Everything in this file
 // must only run in the browser (it touches canvas, workers and object URLs).
 
@@ -30,6 +31,8 @@ export interface OutlineItem {
 export interface RenderedPdf {
   pages: RenderedPage[];
   outline: OutlineItem[];
+  /** Plain text of each page (index-aligned with `pages`), for full-text search. */
+  pageTexts: string[];
 }
 
 // The "legacy" build ships transpiled + polyfilled code; the modern build
@@ -61,6 +64,7 @@ export async function renderPdfToPages(
   const task = pdfjs.getDocument({ url: pdfUrl });
   const doc = await task.promise;
   const pages: RenderedPage[] = [];
+  const pageTexts: string[] = [];
   let outline: OutlineItem[] = [];
 
   try {
@@ -88,6 +92,21 @@ export async function renderPdfToPages(
 
       const links = await extractLinks(doc, page, viewport);
 
+      // Text layer for full-text search (no rendering cost worth worrying about).
+      let text = "";
+      try {
+        const tc = await page.getTextContent();
+        text = tc.items
+          .map((it) => ("str" in it ? (it as { str: string }).str : ""))
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 20000);
+      } catch {
+        // some PDFs have no text layer — search just won't match that page
+      }
+      pageTexts.push(text);
+
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob(resolve, "image/jpeg", 0.88)
       );
@@ -104,15 +123,18 @@ export async function renderPdfToPages(
       page.cleanup();
       onProgress?.(i, doc.numPages);
     }
+  } catch (error) {
+    pages.forEach((page) => URL.revokeObjectURL(page.objectUrl));
+    throw error;
   } finally {
     task.destroy().catch(() => {});
   }
 
   if (signal?.cancelled) {
     pages.forEach((p) => URL.revokeObjectURL(p.objectUrl));
-    return { pages: [], outline: [] };
+    return { pages: [], outline: [], pageTexts: [] };
   }
-  return { pages, outline };
+  return { pages, outline, pageTexts };
 }
 
 /** Flatten the PDF's bookmark tree into a list with depth markers. */
@@ -187,7 +209,7 @@ async function extractLinks(
       height: (height / viewport.height) * 100,
     };
 
-    if (typeof annot.url === "string" && annot.url) {
+    if (typeof annot.url === "string" && safeLink(annot.url)) {
       links.push({ ...box, url: annot.url });
       continue;
     }
@@ -210,6 +232,84 @@ async function extractLinks(
     }
   }
   return links;
+}
+
+// A cached document handle for on-demand hi-res renders (zoom), so we parse the
+// PDF once rather than reopening it for every zoomed page.
+const hiResDocCache = new Map<string, Promise<Awaited<ReturnType<Pdfjs["getDocument"]>["promise"]>>>();
+
+function getCachedDoc(pdfUrl: string) {
+  let p = hiResDocCache.get(pdfUrl);
+  if (!p) {
+    p = loadPdfjs().then((pdfjs) => pdfjs.getDocument({ url: pdfUrl }).promise);
+    hiResDocCache.set(pdfUrl, p);
+  }
+  return p;
+}
+
+/**
+ * Drop a cached zoom document and free its buffers. Without this, every PDF
+ * opened through deep zoom stays parsed in this module-level map for the life of
+ * the tab — browsing several 100 MB books in one session would retain them all.
+ */
+export function releaseHiResDoc(pdfUrl: string) {
+  const pending = hiResDocCache.get(pdfUrl);
+  if (!pending) return;
+  hiResDocCache.delete(pdfUrl);
+  // The loading task owns the worker; destroying it frees the parsed document.
+  pending.then((doc) => doc.loadingTask.destroy()).catch(() => {});
+}
+
+export interface HiResPage {
+  objectUrl: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * Render a single page at high resolution for the zoom/lightbox view, so text
+ * stays crisp instead of upscaling the thumbnail-grade bitmap. `maxEdge` is the
+ * longest side in device pixels of the produced image.
+ */
+export async function renderPageHiRes(
+  pdfUrl: string,
+  pageIndex: number,
+  maxEdge = 3600
+): Promise<HiResPage> {
+  const doc = await getCachedDoc(pdfUrl);
+  const page = await doc.getPage(pageIndex + 1);
+  const base = page.getViewport({ scale: 1 });
+  const scale = Math.min(6, Math.max(1, maxEdge / Math.max(base.width, base.height)));
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvas, viewport }).promise;
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.92)
+  );
+  const width = canvas.width;
+  const height = canvas.height;
+  canvas.width = 0;
+  canvas.height = 0;
+  page.cleanup();
+  if (!blob) throw new Error("Could not render page");
+  return { objectUrl: URL.createObjectURL(blob), width, height };
+}
+
+/** Read a PDF's page count without rendering anything. */
+export async function getPageCount(pdfUrl: string): Promise<number> {
+  const pdfjs = await loadPdfjs();
+  const task = pdfjs.getDocument({ url: pdfUrl });
+  const doc = await task.promise;
+  try {
+    return doc.numPages;
+  } finally {
+    task.destroy().catch(() => {});
+  }
 }
 
 /** Render just the first page of a PDF into an existing canvas (thumbnails). */
