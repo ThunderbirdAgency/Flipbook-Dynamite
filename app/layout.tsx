@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { authEnabled } from "@/lib/auth";
+import { siteMetadata } from "@/lib/seo";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,19 +15,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
+// Site-wide search identity (canonical base, robots, social cards, Search
+// Console proof) lives in lib/seo so it is testable; pages add their own
+// title, description and canonical path on top.
 export const metadata: Metadata = {
-  metadataBase: new URL(appUrl),
+  ...siteMetadata,
   title: "Flipbook Dynamite — Turn PDFs into interactive flipbooks",
   description:
     "Upload a PDF and get a realistic page-flipping book with clickable links and a shareable URL.",
-  openGraph: {
-    title: "Flipbook Dynamite",
-    description: "Turn any PDF into an interactive page-flipping book.",
-    url: appUrl,
-    siteName: "Flipbook Dynamite",
-  },
 };
 
 export default function RootLayout({
