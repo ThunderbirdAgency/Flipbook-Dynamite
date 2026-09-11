@@ -5,6 +5,7 @@ export const metadata = {
   title: "Pricing — Flipbook Dynamite",
   description:
     "Preview the planned Flipbook Dynamite plans. Paid subscriptions are not available yet.",
+  alternates: { canonical: "/pricing" },
 };
 
 interface Plan {

@@ -2,11 +2,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { SiteHeader, SiteFooter } from "@/components/SiteChrome";
 import { authEnabled } from "@/lib/auth";
+import { structuredDataJson } from "@/lib/seo";
 
 export const metadata = {
   title: "Flipbook Dynamite — PDFs that flip, play, and go off",
   description:
     "Turn any PDF into a 3D interactive flipbook — realistic page-flip, video & GIF layers, your branding, full-text search, analytics, and a shareable link or embed for every book.",
+  alternates: { canonical: "/" },
 };
 
 const startHref = authEnabled ? "/sign-up" : "/app";
@@ -14,6 +16,9 @@ const startHref = authEnabled ? "/sign-up" : "/app";
 export default function Landing() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
+      {/* Brand structured data (see lib/seo). JSON-LD is data, not code, so a
+          plain <script> is correct here rather than next/script. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structuredDataJson }} />
       <SiteHeader />
 
       {/* Hero */}
