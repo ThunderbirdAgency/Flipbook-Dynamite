@@ -41,7 +41,11 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {authEnabled ? (
-          <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up">
+          // Clerk beacons usage data to clerk-telemetry.com, a host the CSP's
+          // connect-src deliberately excludes. Left on, every page load would log
+          // a violation for a request we do not want made anyway — noise that
+          // would bury a real one. Disabled at the source instead.
+          <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" telemetry={false}>
             {children}
           </ClerkProvider>
         ) : children}
