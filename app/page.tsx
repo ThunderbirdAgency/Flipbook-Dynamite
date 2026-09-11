@@ -22,18 +22,18 @@ export default function Landing() {
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(60% 50% at 70% 0%, rgba(251,146,60,0.16), transparent 60%), radial-gradient(50% 40% at 0% 20%, rgba(245,158,11,0.10), transparent 60%)",
+              "radial-gradient(60% 50% at 70% 0%, rgba(80,192,232,0.16), transparent 60%), radial-gradient(50% 40% at 0% 20%, rgba(43,169,214,0.10), transparent 60%)",
           }}
         />
         <div className="relative mx-auto grid w-full max-w-6xl items-center gap-12 px-6 py-16 lg:grid-cols-[1.05fr_1fr] lg:py-24">
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-medium text-amber-300">
+            <span className="inline-flex items-center gap-2 rounded-full border border-brand-400/30 bg-brand-400/10 px-3 py-1 text-xs font-medium text-brand-300">
               🧨 PDF → interactive flipbook
             </span>
             <h1 className="mt-5 text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
               Flipbooks that
               <br />
-              <span className="bg-gradient-to-r from-amber-300 via-orange-400 to-orange-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-brand-300 via-brand-400 to-brand-600 bg-clip-text text-transparent">
                 go off.
               </span>
             </h1>
@@ -45,7 +45,7 @@ export default function Landing() {
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
                 href={startHref}
-                className="rounded-full bg-amber-400 px-6 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_30px_-6px_rgba(251,146,60,0.8)] transition hover:bg-amber-300"
+                className="rounded-full bg-brand-400 px-6 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_30px_-6px_rgba(80,192,232,0.8)] transition hover:bg-brand-300"
               >
                 Start free — light the fuse
               </Link>
@@ -62,11 +62,11 @@ export default function Landing() {
           </div>
 
           <div className="relative">
-            <div className="absolute -inset-4 rounded-3xl bg-gradient-to-tr from-amber-500/20 to-orange-600/10 blur-2xl" />
+            <div className="absolute -inset-4 rounded-3xl bg-gradient-to-tr from-brand-500/20 to-brand-600/10 blur-2xl" />
             <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
               <div className="flex items-center gap-1.5 border-b border-white/5 bg-slate-950/60 px-3 py-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-red-400/70" />
-                <span className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
+                <span className="h-2.5 w-2.5 rounded-full bg-yellow-400/70" />
                 <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
               </div>
               <Image
@@ -95,9 +95,9 @@ export default function Landing() {
           {FEATURES.map((f) => (
             <div
               key={f.title}
-              className="rounded-2xl border border-white/10 bg-slate-900/50 p-6 transition hover:border-amber-400/30"
+              className="rounded-2xl border border-white/10 bg-slate-900/50 p-6 transition hover:border-brand-400/30"
             >
-              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-amber-400/10 text-amber-400">
+              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-brand-400/10 text-brand-400">
                 {f.icon}
               </div>
               <h3 className="text-base font-semibold text-white">{f.title}</h3>
@@ -116,7 +116,7 @@ export default function Landing() {
           <div className="mt-12 grid gap-8 md:grid-cols-3">
             {STEPS.map((s, i) => (
               <div key={s.title} className="relative">
-                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-600 text-sm font-bold text-slate-950">
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-bold text-slate-950">
                   {i + 1}
                 </div>
                 <h3 className="text-lg font-semibold text-white">{s.title}</h3>
@@ -141,14 +141,14 @@ export default function Landing() {
               key={p.name}
               className={`rounded-2xl border p-6 ${
                 p.featured
-                  ? "border-amber-400/50 bg-amber-400/[0.06]"
+                  ? "border-brand-400/50 bg-brand-400/[0.06]"
                   : "border-white/10 bg-slate-900/50"
               }`}
             >
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-white">{p.name}</h3>
                 {p.featured && (
-                  <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-slate-950">
+                  <span className="rounded-full bg-brand-400 px-2 py-0.5 text-[10px] font-bold text-slate-950">
                     POPULAR
                   </span>
                 )}
@@ -162,7 +162,7 @@ export default function Landing() {
                 href="/pricing"
                 className={`mt-5 block rounded-full px-4 py-2 text-center text-sm font-semibold transition ${
                   p.featured
-                    ? "bg-amber-400 text-slate-950 hover:bg-amber-300"
+                    ? "bg-brand-400 text-slate-950 hover:bg-brand-300"
                     : "border border-white/15 text-white hover:bg-white/5"
                 }`}
               >
@@ -172,7 +172,7 @@ export default function Landing() {
           ))}
         </div>
         <p className="mt-6 text-center text-sm text-slate-500">
-          <Link href="/pricing" className="text-amber-400 hover:underline">
+          <Link href="/pricing" className="text-brand-400 hover:underline">
             Compare all plans →
           </Link>
         </p>
@@ -180,10 +180,10 @@ export default function Landing() {
 
       {/* CTA */}
       <section className="mx-auto w-full max-w-5xl px-6 pb-24">
-        <div className="relative overflow-hidden rounded-3xl border border-amber-400/20 bg-gradient-to-br from-slate-900 to-slate-950 px-8 py-14 text-center">
+        <div className="relative overflow-hidden rounded-3xl border border-brand-400/20 bg-gradient-to-br from-slate-900 to-slate-950 px-8 py-14 text-center">
           <div
             className="pointer-events-none absolute inset-0"
-            style={{ background: "radial-gradient(60% 80% at 50% 0%, rgba(251,146,60,0.18), transparent 60%)" }}
+            style={{ background: "radial-gradient(60% 80% at 50% 0%, rgba(80,192,232,0.18), transparent 60%)" }}
           />
           <div className="relative">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
@@ -194,7 +194,7 @@ export default function Landing() {
             </p>
             <Link
               href={startHref}
-              className="mt-7 inline-block rounded-full bg-amber-400 px-8 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_30px_-6px_rgba(251,146,60,0.8)] transition hover:bg-amber-300"
+              className="mt-7 inline-block rounded-full bg-brand-400 px-8 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_30px_-6px_rgba(80,192,232,0.8)] transition hover:bg-brand-300"
             >
               Start free
             </Link>

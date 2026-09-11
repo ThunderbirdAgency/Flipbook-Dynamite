@@ -22,7 +22,7 @@ export default async function InsightsPage({ params }: Props) {
       <header className="flex items-center gap-3 border-b border-slate-800/80 px-4 py-3 sm:px-6">
         <Link
           href={`/book/${id}`}
-          className="flex items-center gap-1.5 text-sm font-medium text-slate-300 transition hover:text-amber-400"
+          className="flex items-center gap-1.5 text-sm font-medium text-slate-300 transition hover:text-brand-400"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />

@@ -105,7 +105,7 @@ export default function PricingPage() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
       <SiteHeader active="pricing" />
-      <p role="status" className="mx-auto mt-6 max-w-4xl rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-center text-sm text-amber-200">Pricing preview: these are planned plans and limits. Paid subscriptions are not available yet. The current preview includes up to 100 flipbooks and 1 GB of PDF storage per account.</p>
+      <p role="status" className="mx-auto mt-6 max-w-4xl rounded-xl border border-brand-400/30 bg-brand-400/10 p-4 text-center text-sm text-brand-200">Pricing preview: these are planned plans and limits. Paid subscriptions are not available yet. The current preview includes up to 100 flipbooks and 1 GB of PDF storage per account.</p>
 
       <section className="mx-auto w-full max-w-6xl px-6 pt-16 text-center">
         <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
@@ -123,14 +123,14 @@ export default function PricingPage() {
             key={p.id}
             className={`flex flex-col rounded-2xl border p-6 ${
               p.featured
-                ? "border-amber-400/50 bg-amber-400/[0.06] shadow-[0_0_40px_-12px_rgba(251,146,60,0.5)]"
+                ? "border-brand-400/50 bg-brand-400/[0.06] shadow-[0_0_40px_-12px_rgba(80,192,232,0.5)]"
                 : "border-white/10 bg-slate-900/50"
             }`}
           >
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white">{p.name}</h2>
               {p.featured && (
-                <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-slate-950">
+                <span className="rounded-full bg-brand-400 px-2 py-0.5 text-[10px] font-bold text-slate-950">
                   POPULAR
                 </span>
               )}
@@ -145,7 +145,7 @@ export default function PricingPage() {
               href={p.id === "free" ? "/app" : `/api/checkout?plan=${p.id}`}
               className={`mt-5 block rounded-full px-4 py-2.5 text-center text-sm font-semibold transition ${
                 p.featured
-                  ? "bg-amber-400 text-slate-950 hover:bg-amber-300"
+                  ? "bg-brand-400 text-slate-950 hover:bg-brand-300"
                   : "border border-white/15 text-white hover:bg-white/5"
               }`}
             >
@@ -156,7 +156,7 @@ export default function PricingPage() {
               {p.features.map((f) => (
                 <li key={f} className="flex gap-2.5">
                   <svg
-                    className="mt-0.5 shrink-0 text-amber-400"
+                    className="mt-0.5 shrink-0 text-brand-400"
                     width="16"
                     height="16"
                     viewBox="0 0 24 24"

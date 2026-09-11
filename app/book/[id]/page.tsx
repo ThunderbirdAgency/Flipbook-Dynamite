@@ -45,14 +45,14 @@ export default async function BookPage({ params }: Props) {
         <div className="flex min-w-0 items-center gap-3">
           <Link
             href={canManage ? "/app" : "/"}
-            className="flex shrink-0 items-center gap-2 text-sm font-semibold text-white transition hover:text-amber-400"
+            className="flex shrink-0 items-center gap-2 text-sm font-semibold text-white transition hover:text-brand-400"
             title={canManage ? "Back to your library" : "Flipbook Dynamite"}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6" />
             </svg>
             <span className="hidden sm:inline">
-              Flipbook <span className="text-amber-400">Dynamite</span>
+              Flipbook <span className="text-brand-400">Dynamite</span>
             </span>
           </Link>
           <span className="hidden text-slate-700 sm:inline">/</span>
@@ -98,7 +98,7 @@ function PrivateNotice() {
         </p>
         <Link
           href="/"
-          className="mt-5 inline-block rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-300"
+          className="mt-5 inline-block rounded-lg bg-brand-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-brand-300"
         >
           Go home
         </Link>

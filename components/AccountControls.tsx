@@ -14,7 +14,7 @@ export default function AccountControls({ enabled }: { enabled: boolean }) {
       </Link>
       <Link
         href={enabled ? "/sign-up" : "/app"}
-        className="whitespace-nowrap rounded-full bg-amber-400 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-amber-300 sm:px-4 sm:text-sm"
+        className="whitespace-nowrap rounded-full bg-brand-400 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-brand-300 sm:px-4 sm:text-sm"
       >
         Start free
       </Link>

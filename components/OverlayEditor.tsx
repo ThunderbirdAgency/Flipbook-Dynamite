@@ -187,7 +187,7 @@ export default function OverlayEditor({ bookId, title, branding, onMetadataChang
           <button
             onClick={save}
             disabled={saving || uploading || !publicationTitle.trim()}
-            className="rounded-lg bg-amber-400 px-4 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:opacity-50"
+            className="rounded-lg bg-brand-400 px-4 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-300 disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save changes"}
           </button>
@@ -204,9 +204,9 @@ export default function OverlayEditor({ bookId, title, branding, onMetadataChang
         <aside aria-label="Add elements" className="w-44 shrink-0 overflow-y-auto border-r border-slate-700 bg-slate-900 p-3">
           <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-400">Add to page {pageNum}</h2>
           <div className="space-y-2"><AddBtn label="Video" hint="YouTube · Vimeo · MP4" onClick={()=>add("video")}/><AddBtn label="Link" hint="Website or page" onClick={()=>add("link")}/><AddBtn label="Inline image" hint="Place on the page" onClick={()=>add("image","inline")}/><AddBtn label="Pop-up image" hint="Open on click" onClick={()=>add("image","popup")}/><AddBtn label="Animated GIF" hint="Add motion" onClick={()=>add("image","inline")}/><AddBtn label="Forms & embeds" hint="Embed a hosted form" onClick={()=>add("iframe")}/></div>
-          <button onClick={()=>setDetails(true)} className="mt-5 w-full rounded-lg border border-amber-400/40 px-3 py-3 text-left text-sm text-amber-300">Title & SEO</button>
+          <button onClick={()=>setDetails(true)} className="mt-5 w-full rounded-lg border border-brand-400/40 px-3 py-3 text-left text-sm text-brand-300">Title & SEO</button>
         </aside>
-        <nav aria-label="Page thumbnails" className="w-24 shrink-0 space-y-3 overflow-y-auto border-r border-slate-800 bg-slate-900/40 p-3">{pages.map((p,i)=><button key={i} aria-label={`Edit page ${i+1}`} aria-current={pageIdx===i?"page":undefined} onClick={()=>{setPageIdx(i);setSelected(null);}} className={`block w-full rounded-lg border-2 p-1 ${pageIdx===i?"border-amber-400":"border-transparent hover:border-slate-600"}`}>
+        <nav aria-label="Page thumbnails" className="w-24 shrink-0 space-y-3 overflow-y-auto border-r border-slate-800 bg-slate-900/40 p-3">{pages.map((p,i)=><button key={i} aria-label={`Edit page ${i+1}`} aria-current={pageIdx===i?"page":undefined} onClick={()=>{setPageIdx(i);setSelected(null);}} className={`block w-full rounded-lg border-2 p-1 ${pageIdx===i?"border-brand-400":"border-transparent hover:border-slate-600"}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={p.objectUrl} alt="" className="w-full bg-white"/><span className="mt-1 block text-xs text-slate-400">{i+1}</span></button>)}</nav>
         {/* Canvas */}
@@ -312,14 +312,14 @@ export default function OverlayEditor({ bookId, title, branding, onMetadataChang
                   placeholder={
                     sel.type === "video" ? "https://youtube.com/watch?v=…" : "https://…"
                   }
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-brand-400/60"
                 />
 
                 <label className="block text-xs font-medium text-slate-400">Label (optional)</label>
                 <input
                   value={sel.label || ""}
                   onChange={(e) => update(sel.id, { label: e.target.value })}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-brand-400/60"
                 />
 
                 {(sel.type === "video" || sel.type === "iframe" || sel.type === "image") && (
@@ -332,7 +332,7 @@ export default function OverlayEditor({ bookId, title, branding, onMetadataChang
                           onClick={() => update(sel.id, { display: d })}
                           className={`flex-1 rounded-lg border px-3 py-1.5 text-sm capitalize transition ${
                             (sel.display || (sel.type === "image" ? "inline" : "popup")) === d
-                              ? "border-amber-400 bg-amber-400/10 text-amber-300"
+                              ? "border-brand-400 bg-brand-400/10 text-brand-300"
                               : "border-slate-700 text-slate-300 hover:border-slate-500"
                           }`}
                         >
@@ -411,7 +411,7 @@ function AddBtn({ label, hint, onClick }: { label: string; hint: string; onClick
   return (
     <button
       onClick={onClick}
-      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-left transition hover:border-amber-400/60 hover:bg-slate-900"
+      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-left transition hover:border-brand-400/60 hover:bg-slate-900"
     >
       <span className="block text-sm font-medium text-white">{label}</span>
       <span className="mt-0.5 block text-[11px] text-slate-500">{hint}</span>

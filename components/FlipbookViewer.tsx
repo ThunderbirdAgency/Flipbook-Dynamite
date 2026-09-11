@@ -56,7 +56,7 @@ export default function FlipbookViewer({
   const [overlayList, setOverlayList] = useState<Overlay[]>(overlays);
   const [editOpen, setEditOpen] = useState(()=>isOwner && typeof window!=="undefined" && new URLSearchParams(location.search).get("edit")==="1");
   const [lightbox, setLightbox] = useState<Overlay | null>(null);
-  const accent = brand.accent || "#fbbf24";
+  const accent = brand.accent || "#50c0e8";
   const showDownload = brand.allowDownload !== false && Boolean(downloadUrl);
   const customBg = brand.bgImageUrl
     ? `center / cover no-repeat url("${brand.bgImageUrl}")`
@@ -296,7 +296,7 @@ export default function FlipbookViewer({
       >
         {status === "loading" && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 text-slate-300">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-600 border-t-amber-400" />
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-600 border-t-brand-400" />
             <p className="text-sm">
               {progress.total > 0
                 ? `Preparing your flipbook — page ${progress.done} of ${progress.total}`
@@ -305,7 +305,7 @@ export default function FlipbookViewer({
             {progress.total > 0 && (
               <div className="h-1.5 w-56 overflow-hidden rounded-full bg-slate-800">
                 <div
-                  className="h-full rounded-full bg-amber-400 transition-all"
+                  className="h-full rounded-full bg-brand-400 transition-all"
                   style={{ width: `${(progress.done / progress.total) * 100}%` }}
                 />
               </div>
@@ -649,7 +649,7 @@ function PageIndicator({
           value={value}
           onChange={(e) => setValue(e.target.value.replace(/\D/g, ""))}
           onBlur={() => setEditing(false)}
-          className="w-14 rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-center text-sm text-white outline-none focus:border-amber-400"
+          className="w-14 rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-center text-sm text-white outline-none focus:border-brand-400"
           placeholder={String(current + 1)}
           aria-label="Jump to page"
         />
@@ -690,7 +690,7 @@ function ToolbarButton({
           ? "text-slate-950"
           : "text-slate-300 hover:bg-slate-700/70 hover:text-white"
       }`}
-      style={active ? { background: "var(--fb-accent, #fbbf24)" } : undefined}
+      style={active ? { background: "var(--fb-accent, #50c0e8)" } : undefined}
       title={label}
       aria-label={label}
     >
