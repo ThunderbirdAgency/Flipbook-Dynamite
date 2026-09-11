@@ -73,7 +73,7 @@ export default function SearchPanel({ pageTexts, onSelect, onClose }: SearchPane
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search inside this book…"
-          className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60"
+          className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-brand-400/60"
         />
         {q.length >= 2 && (
           <p className="mt-2 text-xs text-slate-500">
@@ -101,11 +101,11 @@ export default function SearchPanel({ pageTexts, onSelect, onClose }: SearchPane
               className="block w-full border-b border-slate-900 px-4 py-2.5 text-left transition hover:bg-slate-800/70"
             >
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs font-medium text-amber-400">Page {m.pageIndex + 1}</span>
+                <span className="text-xs font-medium text-brand-400">Page {m.pageIndex + 1}</span>
               </div>
               <p className="text-xs leading-relaxed text-slate-400">
                 {m.snippet.before}
-                <mark className="rounded bg-amber-400/30 px-0.5 text-amber-100">{m.snippet.hit}</mark>
+                <mark className="rounded bg-brand-400/30 px-0.5 text-brand-100">{m.snippet.hit}</mark>
                 {m.snippet.after}
               </p>
             </button>

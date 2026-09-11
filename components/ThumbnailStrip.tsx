@@ -27,13 +27,13 @@ export default function ThumbnailStrip({ pages, current, onSelect }: ThumbnailSt
               ref={i === current ? activeRef : undefined}
               onClick={() => onSelect(i)}
               className={`overflow-hidden rounded-lg border-2 transition ${
-                active ? "border-amber-400" : "border-transparent hover:border-slate-600"
+                active ? "border-brand-400" : "border-transparent hover:border-slate-600"
               }`}
               title={`Page ${i + 1}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={page.objectUrl} alt={`Page ${i + 1} thumbnail`} loading="lazy" className="w-full" />
-              <span className={`block py-1 text-center text-[11px] ${active ? "bg-amber-400 font-semibold text-slate-950" : "bg-slate-900 text-slate-400"}`}>
+              <span className={`block py-1 text-center text-[11px] ${active ? "bg-brand-400 font-semibold text-slate-950" : "bg-slate-900 text-slate-400"}`}>
                 {i + 1}
               </span>
             </button>

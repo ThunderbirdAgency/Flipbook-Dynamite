@@ -47,7 +47,7 @@ export default function InsightsClient({ id, pdfUrl }: { id: string; pdfUrl: str
   if (status === "loading") {
     return (
       <div className="flex items-center justify-center gap-3 py-24 text-slate-400">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-amber-400" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-brand-400" />
         <span className="text-sm">Crunching the numbers…</span>
       </div>
     );
@@ -102,7 +102,7 @@ export default function InsightsClient({ id, pdfUrl }: { id: string; pdfUrl: str
                   </span>
                   <div className="h-5 flex-1 overflow-hidden rounded bg-slate-900">
                     <div
-                      className="h-full rounded bg-gradient-to-r from-amber-500 to-amber-400 transition-all"
+                      className="h-full rounded bg-gradient-to-r from-brand-500 to-brand-400 transition-all"
                       style={{ width: `${pct}%` }}
                     />
                   </div>

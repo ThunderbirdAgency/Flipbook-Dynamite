@@ -4,7 +4,7 @@ import type {Book} from '@/lib/types';
 import type {PublishingItem,LinkStats} from '@/lib/publishing';
 import {CopyField,SharePanel} from './ShareDialog';
 const field='w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm text-white';
-const button='rounded-lg border border-slate-700 px-4 py-2 text-sm text-white hover:border-amber-400 disabled:opacity-40';
+const button='rounded-lg border border-slate-700 px-4 py-2 text-sm text-white hover:border-brand-400 disabled:opacity-40';
 type Kind='custom'|'track'|'shelf';
 export default function PublishingPanel({kind,books}:{kind:Kind;books:Book[]}){
  const [now]=useState(()=>Date.now());

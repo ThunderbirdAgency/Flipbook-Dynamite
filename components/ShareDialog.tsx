@@ -73,7 +73,7 @@ export default function ShareDialog({
         </div>
 
         <nav aria-label="Sharing options" className="mb-6 flex gap-2 border-b border-slate-700 pb-3">
-          {([['link','Flipbook link'], ...(embedCode ? [['embed','Embed']] : []), ...(isOwner ? [['privacy','Privacy']] : [])]).map(([id,label]) => <button key={id} aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id as typeof tab)} className={`rounded-lg px-3 py-2 text-sm ${tab === id ? 'bg-amber-400/10 text-amber-300' : 'text-slate-400 hover:text-white'}`}>{label}</button>)}
+          {([['link','Flipbook link'], ...(embedCode ? [['embed','Embed']] : []), ...(isOwner ? [['privacy','Privacy']] : [])]).map(([id,label]) => <button key={id} aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id as typeof tab)} className={`rounded-lg px-3 py-2 text-sm ${tab === id ? 'bg-brand-400/10 text-brand-300' : 'text-slate-400 hover:text-white'}`}>{label}</button>)}
         </nav>
         {tab === "link" && <><CopyField label="Flipbook link" value={resolvedShareUrl} /><label className="mb-4 block text-sm text-slate-300">Open at page (optional)<input type="number" min="1" max="100000" value={page} onChange={e=>setPage(e.target.value)} className="ml-3 w-20 rounded border border-slate-700 bg-slate-950 p-2"/></label><SharePanel shareUrl={resolvedShareUrl} title={title} /></>}
         {tab === "embed" && embedCode && (
@@ -128,7 +128,7 @@ export function SharePanel({ shareUrl, title }: { shareUrl: string; title: strin
               href={l.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-amber-400/60 hover:text-white"
+              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-brand-400/60 hover:text-white"
             >
               {l.label}
             </a>
@@ -141,7 +141,7 @@ export function SharePanel({ shareUrl, title }: { shareUrl: string; title: strin
             <a
               href={qr}
               download="flipbook-qr.png"
-              className="mt-1 block text-[11px] text-amber-400 hover:underline"
+              className="mt-1 block text-[11px] text-brand-400 hover:underline"
             >
               Download QR
             </a>
@@ -234,7 +234,7 @@ export function PrivacyPanel({
           disabled={clearPassword}
           onChange={(e) => setPassword(e.target.value)}
           placeholder={hasPassword ? "•••••••• (unchanged)" : "Leave blank for none"}
-          className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60 disabled:opacity-40"
+          className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-brand-400/60 disabled:opacity-40"
         />
         {hasPassword && (
           <label className="mt-2 flex items-center gap-2 text-xs text-slate-400">
@@ -242,7 +242,7 @@ export function PrivacyPanel({
               type="checkbox"
               checked={clearPassword}
               onChange={(e) => setClearPassword(e.target.checked)}
-              className="accent-amber-400"
+              className="accent-brand-400"
             />
             Remove the password
           </label>
@@ -257,7 +257,7 @@ export function PrivacyPanel({
         <button
           onClick={save}
           disabled={saving}
-          className="rounded-lg bg-amber-400 px-4 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:opacity-50"
+          className="rounded-lg bg-brand-400 px-4 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-300 disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save privacy"}
         </button>
@@ -282,11 +282,11 @@ function VisibilityOption({
       onClick={onClick}
       className={`rounded-xl border px-3 py-2.5 text-left transition ${
         active
-          ? "border-amber-400 bg-amber-400/10"
+          ? "border-brand-400 bg-brand-400/10"
           : "border-slate-700 bg-slate-950 hover:border-slate-600"
       }`}
     >
-      <span className={`block text-sm font-medium ${active ? "text-amber-300" : "text-white"}`}>
+      <span className={`block text-sm font-medium ${active ? "text-brand-300" : "text-white"}`}>
         {label}
       </span>
       <span className="mt-0.5 block text-xs text-slate-500">{hint}</span>
@@ -319,7 +319,7 @@ export function CopyField({ label, value, multiline }: { label: string; value: s
         <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</span>
         <button
           onClick={copy}
-          className="rounded-md px-2 py-0.5 text-xs font-medium text-amber-400 transition hover:bg-slate-800"
+          className="rounded-md px-2 py-0.5 text-xs font-medium text-brand-400 transition hover:bg-slate-800"
         >
           {copied ? "Copied ✓" : "Copy"}
         </button>
@@ -330,14 +330,14 @@ export function CopyField({ label, value, multiline }: { label: string; value: s
           value={value}
           rows={3}
           onFocus={(e) => e.target.select()}
-          className="w-full resize-none rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-300 outline-none focus:border-amber-400/60"
+          className="w-full resize-none rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-300 outline-none focus:border-brand-400/60"
         />
       ) : (
         <input
           readOnly
           value={value}
           onFocus={(e) => e.target.select()}
-          className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-300 outline-none focus:border-amber-400/60"
+          className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-300 outline-none focus:border-brand-400/60"
         />
       )}
     </div>

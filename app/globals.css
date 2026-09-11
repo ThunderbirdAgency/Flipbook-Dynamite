@@ -12,6 +12,21 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Brand accent, sampled from the "FLIPBOOK" lettering in the logo artwork
+   (rgb 80 192 232). Every UI accent — buttons, links, focus rings, badges,
+   progress — draws from this scale so the product and the mark read as one
+   thing. 400 is the logo's own blue; the rest are tints and shades of it.
+   Semantic colours (red for errors, the overlay-type legend) stay separate. */
+@theme {
+  --color-brand-100: #dff3fa;
+  --color-brand-200: #b9e6f5;
+  --color-brand-300: #86d4ee;
+  --color-brand-400: #50c0e8;
+  --color-brand-500: #2ba9d6;
+  --color-brand-600: #1a8ab5;
+  --color-brand-700: #146c8e;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
@@ -199,8 +214,8 @@ body {
 }
 
 .fb-link:hover {
-  background: rgba(251, 191, 36, 0.18);
-  outline: 1px solid rgba(251, 191, 36, 0.55);
+  background: rgba(80, 192, 232, 0.18);
+  outline: 1px solid rgba(80, 192, 232, 0.55);
 }
 
 /* Interactive overlays (video / image / iframe layers) sit above paper cues. */

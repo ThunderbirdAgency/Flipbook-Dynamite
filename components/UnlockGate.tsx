@@ -53,7 +53,7 @@ export default function UnlockGate({
         onSubmit={submit}
         className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center"
       >
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400/10 text-amber-400">
+        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-400/10 text-brand-400">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
@@ -69,13 +69,13 @@ export default function UnlockGate({
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Enter password"
-          className="mt-5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-center text-sm text-white outline-none focus:border-amber-400/60"
+          className="mt-5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-center text-sm text-white outline-none focus:border-brand-400/60"
         />
         {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
         <button
           type="submit"
           disabled={busy || !password}
-          className="mt-4 w-full rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:opacity-50"
+          className="mt-4 w-full rounded-lg bg-brand-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-brand-300 disabled:opacity-50"
         >
           {busy ? "Unlocking…" : "Unlock"}
         </button>
