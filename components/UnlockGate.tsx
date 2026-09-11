@@ -2,8 +2,24 @@
 
 import { useState } from "react";
 
-/** Password prompt shown before a protected book renders. */
-export default function UnlockGate({ id, title }: { id: string; title: string }) {
+/**
+ * Password prompt shown before a protected book renders.
+ *
+ * `embed` tells the server this unlock is happening inside an <iframe> on
+ * someone else's site. The fetch itself is same-origin (the iframe document is
+ * ours), but the browser still treats the cookie jar as third-party, so the
+ * grant has to be issued as SameSite=None to survive. We ask for that only when
+ * it is actually needed rather than weakening the cookie for every viewer.
+ */
+export default function UnlockGate({
+  id,
+  title,
+  embed = false,
+}: {
+  id: string;
+  title: string;
+  embed?: boolean;
+}) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -17,7 +33,7 @@ export default function UnlockGate({ id, title }: { id: string; title: string })
       const res = await fetch(`/api/books/${id}/unlock`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password, embed }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));

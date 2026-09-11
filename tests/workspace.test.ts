@@ -12,7 +12,7 @@ test("workspace persists folders, isolates creators, and preserves books when fo
   grant all on public.flipbook_books,public.flipbook_events to service_role;
   insert into public.flipbook_books(id,owner_id,status,size) values('ownersbook01','owner','ready',20),('othersbook01','other','ready',20);
   insert into public.flipbook_events values('ownersbook01','view'),('ownersbook01','view'),('othersbook01','view');`);
-  const sql=await readFile(new URL('./fixtures/workspace-schema.sql',import.meta.url),'utf8');
+  const sql=await readFile(new URL('../supabase/migrations/20260908000200_workspace_folders.sql',import.meta.url),'utf8');
   await db.exec(sql);
   for(const role of ['anon','authenticated']){
    await db.exec('set role '+role);

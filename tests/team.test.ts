@@ -12,7 +12,7 @@ test('team permissions protect owner/admin authority and deny viewer writes',()=
 });
 test('team SQL denies direct access, binds invitations to verified emails, consumes once, and prevents escalation',async()=>{
  const db=new PGlite();try{
- await db.exec('create role anon;create role authenticated;create role service_role bypassrls;grant usage on schema public to anon,authenticated,service_role;');await db.exec(await readFile(new URL('./fixtures/team-schema.sql',import.meta.url),'utf8'));
+ await db.exec('create role anon;create role authenticated;create role service_role bypassrls;grant usage on schema public to anon,authenticated,service_role;');await db.exec(await readFile(new URL('../supabase/migrations/20260908000400_team_access.sql',import.meta.url),'utf8'));
  const call=(actor:string,workspace:string,action:string,payload:object)=>db.query<{value:{ownerId:string}}>('select flipbook_team_change($1,$2,$3,$4) value',[actor,workspace,action,JSON.stringify(payload)]);
  for(const role of ['anon','authenticated']){await db.exec(`set role ${role}`);await assert.rejects(db.query('select * from flipbook_team_members'));await assert.rejects(db.query('select * from flipbook_team_invites'));await assert.rejects(call('owner','owner','invite',{}));await db.exec('reset role');}
  await db.exec('set role service_role');
