@@ -128,6 +128,17 @@ test("every route carries transport security and a script-origin policy", async 
   assert.equal(csp.includes("frame-ancestors"), false);
 });
 
+test("eval is allowed only for React's development build, never in production", async () => {
+  const { cspFor } = await import("../next.config");
+  const scriptSrc = (csp: string) => csp.match(/script-src ([^;]*)/)![1];
+  // Development needs it or Next's overlay flags every page as broken.
+  assert.ok(scriptSrc(cspFor(false)).includes("'unsafe-eval'"));
+  // Production never calls eval, so the allowance would be pure exposure.
+  assert.equal(scriptSrc(cspFor(true)).includes("'unsafe-eval'"), false);
+  // The toggle must change nothing else.
+  assert.equal(cspFor(true).replace("script-src 'self' 'unsafe-inline'", "X"), cspFor(false).replace("script-src 'self' 'unsafe-inline' 'unsafe-eval'", "X"));
+});
+
 test("creator and book pages reject cross-site framing without blocking embed pages", async () => {
   const { default: config } = await import("../next.config");
   const rules = await config.headers!();
