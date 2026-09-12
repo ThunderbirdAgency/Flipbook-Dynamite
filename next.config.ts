@@ -32,20 +32,32 @@ const CLERK_ORIGINS = [
  * - `worker-src` allows blob: — pdf.js instantiates its worker that way.
  * Fonts are self-hosted by next/font, so no external font origin is needed.
  */
-const CSP = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${CLERK_ORIGINS}`,
-  `connect-src 'self' ${CLERK_ORIGINS}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
-  "media-src 'self' data: blob: https:",
-  "font-src 'self' data:",
-  "worker-src 'self' blob:",
-  "frame-src 'self' https:",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-].join("; ");
+/**
+ * `production` decides one thing: whether `'unsafe-eval'` is allowed. React's
+ * development build uses eval() for its debugging features and Next's dev
+ * overlay reports every page as broken without it — but the production build
+ * never calls eval, so shipping that allowance would only widen the policy.
+ * Exported so the tests can assert both shapes without re-importing this file
+ * under a different NODE_ENV.
+ */
+export function cspFor(production: boolean): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline'${production ? "" : " 'unsafe-eval'"} ${CLERK_ORIGINS}`,
+    `connect-src 'self' ${CLERK_ORIGINS}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "media-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    "worker-src 'self' blob:",
+    "frame-src 'self' https:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
+}
+
+const CSP = cspFor(process.env.NODE_ENV === "production");
 
 /**
  * Next REPLACES a header when two rules set the same key — it does not emit both
